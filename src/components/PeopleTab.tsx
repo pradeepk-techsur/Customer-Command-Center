@@ -105,32 +105,6 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate }: { order: CallOrd
           </div>
         )}
       </div>
-
-      <div className="card" style={{ marginTop: 18 }}>
-        <div className="card-head wide">By labor category</div>
-        {groupByLcat(c).map((g) => (
-          <div key={g.name} style={{ borderBottom: "1px solid var(--line-soft)" }}>
-            <div className="grid lcat-group-head lcat-group-cols">
-              <div style={{ fontWeight: 600 }}>{g.name}</div>
-              <div className="right status-token">{g.fte || "—"} FTE</div>
-              <div className={"right status-token" + (g.fte && g.assigned > g.fte ? " over-fte" : "")} title={g.fte && g.assigned > g.fte ? "Assigned resources exceed contracted FTE" : undefined}>
-                {g.assigned} filled{g.fte && g.assigned > g.fte ? " · over" : ""}
-              </div>
-              <div className="right num muted">{rate(g.rate)}</div>
-            </div>
-            {!g.people.length && <div className="lcat-group-empty">No resources assigned to this category</div>}
-            {g.people.map((p) => (
-              <div key={p.id} className="grid lcat-group-row lcat-group-cols">
-                <div className={nameClass(p)}>{p.name}</div>
-                <div />
-                <div className="right status-token" style={{ color: "var(--label)" }}>{p.status}</div>
-                <div className="right num">{rate(p.rate)}</div>
-              </div>
-            ))}
-          </div>
-        ))}
-        {!c.laborCategories.length && !c.staff.length && <div className="card-empty">No labor categories or personnel have been recorded for this period.</div>}
-      </div>
     </>
   );
 }

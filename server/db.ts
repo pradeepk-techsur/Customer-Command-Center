@@ -27,3 +27,37 @@ export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<
     client.release();
   }
 }
+
+// ============================================================================
+// Call Order Access Control Helpers
+// ============================================================================
+
+/**
+ * Get list of call order IDs accessible to a user.
+ * Returns:
+ * - For admins/PMs: null (meaning "all call orders")
+ * - For customers: array of call order IDs from user_call_orders table
+ * 
+ * @param db - Database pool or client
+ * @param userId - User ID to check
+ * @param userRole - User's role
+ * @returns Array of call order IDs or null for full access
+ */
+export async function getAccessibleCallOrders(
+  db: Queryable,
+  userId: number,
+  userRole: string
+): Promise<string[] | null> {
+  // Program Managers, admins, and customers have access to all call orders
+  if (userRole === "program_manager" || userRole === "admin" || userRole === "customer") {
+    return null;
+  }
+
+  // For PMs: get assigned call orders
+  const result = await db.query<{ call_order_id: string }>(
+    `select call_order_id from user_call_orders where user_id = $1`,
+    [userId]
+  );
+
+  return result.rows.map(row => row.call_order_id);
+}

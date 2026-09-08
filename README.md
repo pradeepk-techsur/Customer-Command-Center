@@ -17,15 +17,36 @@ Planning documents live under `.planning/`; the TechSur brand guide is under `pr
 
 ## Running locally
 
+**Docker (Recommended):**
+
 ```bash
-cp .env.example .env            # DATABASE_URL, PORT, stale-record thresholds
-docker compose up -d db         # or point DATABASE_URL at any PostgreSQL 16
-npm install
-npm run db:seed                 # applies the schema and loads the source-of-record data
-npm run dev                     # API on :3001, Vite on :5173 (proxies /api and /uploads)
+docker compose up
 ```
 
-Production: `npm run build` then `npm start` serves the API and the built client from one process.
+This starts:
+- PostgreSQL database on port 5432
+- API server on port 3000
+- Vite dev server on port 5173
+
+The containers automatically:
+- Install dependencies
+- Apply database schema migrations
+- Start dev servers with hot reload
+
+Access the portal at http://localhost:5173
+
+**Local npm (Advanced):**
+
+```bash
+cp .env.example .env            # Configure DATABASE_URL and other settings
+docker compose up -d db         # Start only the database
+npm install
+npm run db:migrate              # Apply schema
+npm run db:seed                 # Load initial data
+npm run dev                     # Start both servers
+```
+
+**Production:** `npm run build` then `npm start` serves the API and the built client from one process.
 
 ## What the portal does
 
@@ -35,21 +56,27 @@ Production: `npm run build` then `npm start` serves the API and the built client
 - **Call order detail** — Financials (funding summary to the cent, contracted labor categories),
   People (tiles, roster, by-labor-category drill-down with over-FTE flag), Weekly Status Reports
   (authored in the portal or uploaded, per call order).
+- **Weekly Status Reports** — Project Managers create reports for their assigned call orders with 
+  Sunday week selectors, draft/submit workflow, and auto-save. Program Managers view consolidated
+  reports across all call orders, identify missing reports, and submit to customers. Customers view
+  submitted reports read-only with week navigation.
 - **Monthly Status Reports** — the BPA-level deliverable log with a section reader per call order.
   PMs can start a blank report, draft one from portal data (funding from the portal, activity from the
   weekly reports authored in that period), upload a file, and add or edit any call order's section.
-- **Roles** — the header switch chooses Customer or Project Manager. Customers see no authoring
-  affordance anywhere, and the API rejects every mutation that does not carry the PM role.
+- **Roles** — Four roles with distinct permissions: Customer (read-only on assigned call orders),
+  Project Manager (edit assigned call orders, create weekly reports), Program Manager (full access,
+  manage all reports), Administrator (user management).
 - **Data currency** — financial and staffing records carry last-updated stamps; any save re-stamps
   them. Records older than `STALE_DAYS_FINANCIALS` / `STALE_DAYS_STAFFING` are flagged.
 - **Audit history** — every change is written to `audit_log` with actor, role, action and details
   (`GET /api/audit`, PM only).
 
-## Identity
+## Authentication
 
-The client sends `x-portal-role` and `x-portal-user` headers based on the "View as" switch. This is a
-stand-in: in production these headers must be set by the identity-aware proxy / SSO layer in front of
-the API, so the browser never decides who is a Project Manager.
+The portal uses JWT-based authentication with access and refresh tokens. Users log in with email and
+password, receiving tokens stored in localStorage. All API requests include the access token in the
+`Authorization: Bearer <token>` header. Optional Microsoft Entra ID (Azure AD) SSO can be configured
+via environment variables (see `.env.example`).
 
 ## Data
 
@@ -61,16 +88,68 @@ documents are stored under `uploads/` and served at `/uploads/…`.
 
 | Method | Path | Role |
 | --- | --- | --- |
+| **Authentication** | | |
+| POST | `/api/auth/login` | public — `{ email, password }` returns tokens |
+| POST | `/api/auth/register` | public — create new user account |
+| POST | `/api/auth/refresh` | any — refresh access token |
+| **Portal Data** | | |
 | GET | `/api/portal` | any — full snapshot |
+| GET | `/api/data` | any — filtered snapshot (role-based) |
+| **Call Orders** | | |
 | POST | `/api/call-orders/upload` | PM — multipart `files` |
 | PATCH | `/api/call-orders/:id/spend` | PM — `{ spend }` |
 | POST | `/api/call-orders/:id/staff` | PM — `{ name, laborCategory, rate }` |
 | PATCH / DELETE | `/api/staff/:id` | PM — `{ status }` |
-| POST | `/api/call-orders/:id/weekly-reports` | PM — authored report |
+| **Weekly Reports** | | |
+| GET | `/api/weekly-reports/weeks` | any — available week dates (Sundays) |
+| POST | `/api/call-orders/:id/weekly-reports` | PM — create report |
+| PUT | `/api/call-orders/:id/weekly-reports/:reportId` | PM/Program Manager — edit report |
+| GET | `/api/call-orders/:id/weekly-reports/:reportId` | PM — get single report detail |
 | POST | `/api/call-orders/:id/weekly-reports/upload` | PM — multipart `files` |
+| GET | `/api/weekly-reports/consolidated/:weekEnding` | Program Manager — all reports for week |
+| POST | `/api/weekly-reports/consolidated/:weekEnding/submit` | Program Manager — submit to customers |
+| GET | `/api/weekly-reports/customer` | Customer — view submitted reports |
+| **Monthly Reports** | | |
 | POST | `/api/monthly-reports` | PM — `{ period, mode: "blank" \| "draft" }` |
 | POST | `/api/monthly-reports/upload` | PM — multipart `files`, `period` |
 | PUT | `/api/monthly-reports/:id/sections/:callOrderId` | PM — section content |
+| **Admin & Audit** | | |
 | GET | `/api/audit` | PM — change history |
+| GET | `/api/admin/users` | Admin — list all users |
+| POST | `/api/admin/users` | Admin — create user |
+| PUT | `/api/admin/users/:id` | Admin — update user |
+| DELETE | `/api/admin/users/:id` | Admin — delete user |
 
-Every mutation responds with the refreshed snapshot.
+Most mutations respond with the refreshed snapshot.
+
+## Troubleshooting
+
+**Changes not appearing in browser:**
+
+If you've modified code but don't see changes:
+
+1. Check Docker logs for errors: `docker logs customer-command-center-api-1`
+2. Restart containers: `docker restart customer-command-center-api-1 customer-command-center-web-1`
+3. Force rebuild if needed: `docker compose up --build`
+
+**Database issues:**
+
+Reset database and reload seed data:
+```bash
+docker compose down -v  # Remove volumes
+docker compose up       # Recreate and reseed
+```
+
+**Port conflicts:**
+
+If ports 3000, 5173, or 5432 are already in use, modify `docker-compose.yml` or stop conflicting services.
+
+**TypeScript errors:**
+
+Check for syntax errors: `npm run type-check`
+
+**Authentication issues:**
+
+- Clear browser localStorage and cookies
+- Check JWT_SECRET is set in `.env`
+- Verify user exists in database: `docker exec -it customer-command-center-db-1 psql -U postgres -d contract_portal -c "SELECT * FROM users;"`

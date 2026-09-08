@@ -1,6 +1,6 @@
 // Types shared by the API server and the React client.
 
-export type Role = "customer" | "pm";
+export type Role = "customer" | "pm" | "admin" | "program_manager";
 
 export interface LaborCategory {
   id: number;
@@ -30,9 +30,13 @@ export interface WeeklyReport {
   weekLabel: string;          // "Sep 8, 2026"
   file: string;
   submittedBy: string;
-  status: string;             // Submitted | Uploaded
+  status: string;             // Submitted | Uploaded (legacy)
+  statusV2: string;           // draft | submitted | uploaded
   href: string | null;
   createdInPortal: boolean;
+  createdByUserId: number | null;
+  submittedAt: string | null; // ISO timestamp
+  lastEditedAt: string | null; // ISO timestamp
   groups: ReportGroup[];      // items for the call order being viewed
 }
 
@@ -86,8 +90,47 @@ export interface MonthlyReport {
   status: string;
   href: string | null;
   scope: string | null;
+  createdByUserId: number | null;
+  reportType: 'program' | 'pm';
+  parentReportId: number | null;
+  customerVisible: boolean;
+  customerReleasedAt: string | null;
+  customerReleasedBy: number | null;
   sections: Record<string, MsrSection>;
 }
+
+export interface ConsolidatedWeeklyReport {
+  id: number;
+  weekEnding: string;        // YYYY-MM-DD (Sunday)
+  weekLabel: string;         // "Sep 8, 2026"
+  status: 'draft' | 'submitted';
+  customerVisible: boolean;
+  customerReleasedAt: string | null;
+  customerReleasedBy: number | null;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+  callOrderReports: CallOrderWeeklyReportStatus[];
+}
+
+export interface CallOrderWeeklyReportStatus {
+  callOrderId: string;
+  callOrderName: string;
+  pm: string;
+  hasReport: boolean;
+  reportId: number | null;
+  reportStatus: 'draft' | 'submitted' | 'uploaded' | null;
+  submittedBy: string | null;
+  submittedAt: string | null;
+}
+
+export const WEEKLY_SECTIONS = {
+  accomplishments: "Accomplishments",
+  planned: "Planned activities",
+  risks: "Risks",
+  issues: "Issues",
+  actions: "Customer actions and decisions",
+} as const;
 
 export interface PortalConfig {
   staleDaysFinancials: number;
@@ -100,6 +143,7 @@ export interface PortalSnapshot {
   contract: { agency: string; vehicle: string; number: string };
   callOrders: CallOrder[];
   monthlyReports: MonthlyReport[];
+  actor?: { id: number; email: string; role: Role };
 }
 
 export interface WeeklyReportInput {
@@ -128,12 +172,3 @@ export interface MsrSectionInput {
 export const STATUS_OPTIONS = [
   "Assigned", "Vacant", "On leave", "PIV pending", "Onboarding", "Recruiting", "Offboarded", "No longer available",
 ];
-
-export const WEEKLY_SECTIONS = {
-  accomplishments: "Accomplishments this week",
-  planned: "Planned activities next week",
-  risks: "Risks",
-  issues: "Issues",
-  actions: "Customer actions and decisions",
-  touchpoint: "Call order items",
-} as const;

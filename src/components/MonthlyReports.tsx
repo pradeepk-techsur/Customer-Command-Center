@@ -4,6 +4,8 @@ import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
 import { dateLabel, fromEntries, lines, localDate, monthLabel, toEntries, usdFull } from "../lib/format.ts";
 import { Button, Eyebrow, Field, FileButton, SortHeaders, TextArea, TextInput } from "./ui.tsx";
+import { SubmissionDashboard } from "./SubmissionDashboard.tsx";
+import { ConsolidationWizard } from "./ConsolidationWizard.tsx";
 import type { Mutate } from "../App.tsx";
 
 const MSR_COLS = [
@@ -17,15 +19,26 @@ const EMP_COLS = [
 
 interface SectionForm { obligated: string; expended: string; remaining: string; eac: string; over: string; completed: string; planned: string; risks: string; issues: string; travel: string }
 
+const formatCurrency = (n: number | null | undefined): string => {
+  if (n === null || n === undefined) return "";
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
+
+const parseCurrency = (s: string): number | null => {
+  const cleaned = s.replace(/[^0-9.-]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+};
+
 function formFor(sec: MsrSection | null, co: CallOrder): SectionForm {
-  const f = (i: number) => sec && sec.funding[i] && sec.funding[i].value !== null ? String(sec.funding[i].value) : "";
+  const f = (i: number) => sec && sec.funding[i] && sec.funding[i].value !== null ? formatCurrency(sec.funding[i].value) : "";
   return sec ? {
     obligated: f(0), expended: f(1), remaining: f(2), eac: f(3), over: f(4),
     completed: fromEntries(sec.completed), planned: fromEntries(sec.planned),
     risks: sec.risks.join("\n"), issues: sec.issues.join("\n"), travel: sec.travel,
   } : {
-    obligated: String(co.funded), expended: String(co.spend), remaining: String(co.funded - co.spend),
-    eac: co.eac === null ? "" : String(co.eac), over: co.over === null ? "" : String(co.over),
+    obligated: formatCurrency(co.funded), expended: formatCurrency(co.spend), remaining: formatCurrency(co.funded - co.spend),
+    eac: co.eac === null ? "" : formatCurrency(co.eac), over: co.over === null ? "" : formatCurrency(co.over),
     completed: "", planned: "", risks: "", issues: "", travel: "N/A",
   };
 }
@@ -52,22 +65,22 @@ export function MonthlyReports({ snapshot, isPm, mutate }: { snapshot: PortalSna
     division: (s) => s.division, name: (s) => s.name, start: (s) => Date.parse(s.start) || 0, lcat: (s) => s.lcat,
   });
 
-  const create = (mode: "blank" | "draft") => mutate(() => api.createMonthly(period, mode)).then((s) => {
-    if (!s) return;
-    const newest = [...s.monthlyReports].sort((a, b) => b.id - a.id)[0];
-    if (newest) setSelectedReport(newest.id);
-  });
   const uploadFiles = (files: FileList) => mutate(() => api.uploadMonthly(period, files)).then((s) => {
     if (!s) return;
     const newest = [...s.monthlyReports].sort((a, b) => b.id - a.id)[0];
     if (newest) setSelectedReport(newest.id);
   });
+  
+  const submitToCustomer = (reportId: number) => {
+    // Simple submission - just mark as customer visible
+    mutate(() => api.submitMonthlyToCustomer(reportId));
+  };
 
   const saveSection = () => {
     if (!rep || !co || !sf) return;
     mutate(() => api.saveSection(rep.id, co.id, {
-      obligated: numOrNull(sf.obligated), expended: numOrNull(sf.expended), remaining: numOrNull(sf.remaining),
-      eac: numOrNull(sf.eac), over: numOrNull(sf.over),
+      obligated: parseCurrency(sf.obligated), expended: parseCurrency(sf.expended), remaining: parseCurrency(sf.remaining),
+      eac: parseCurrency(sf.eac), over: parseCurrency(sf.over),
       completed: toEntries(sf.completed), planned: toEntries(sf.planned),
       risks: lines(sf.risks), issues: lines(sf.issues), travel: sf.travel,
     })).then(() => setSf(null));
@@ -79,21 +92,29 @@ export function MonthlyReports({ snapshot, isPm, mutate }: { snapshot: PortalSna
 
   return (
     <div className="page">
-      <div style={{ marginBottom: 22 }}>
-        <h1>Monthly Status Reports</h1>
-        <div className="page-sub">Contractual deliverable submitted at the BPA level. Each report covers all active call orders.</div>
+      <div style={{ marginBottom: 22, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1>Monthly Status Reports</h1>
+          <div className="page-sub">Upload monthly status reports, edit details, and submit to customers for review.</div>
+        </div>
+        {isPm && rep && (
+          <div style={{ display: "flex", gap: 12 }}>
+            {rep.href && <Button onClick={() => window.open(rep.href!, '_blank')}>Download Report</Button>}
+            <Button primary onClick={() => submitToCustomer(rep.id)}>
+              {rep.status === "Submitted to Customer" ? "Resubmit for Customer Review" : "Submit for Customer Review"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {isPm && (
         <div className="uploader msr">
           <div className="uploader-text">
-            <div className="title">Monthly status report</div>
-            <div className="desc">One document per reporting period, covering funding, monthly activity, staffing, travel, issues and risks for every call order. Due the 15th of the following month. A draft assembles funding from the portal and activity from the weekly reports each PM submitted.</div>
+            <div className="title">Upload Monthly Status Report</div>
+            <div className="desc">Upload a monthly status report document. After upload, you can edit the details and submit it for customer review.</div>
           </div>
-          <Field label="Reporting period"><TextInput value={period} onChange={setPeriod} style={{ width: 150 }} /></Field>
-          <Button primary onClick={() => create("blank")}>New report</Button>
-          <Button onClick={() => create("draft")}>Draft from portal data</Button>
-          <FileButton onFiles={uploadFiles}>Upload file</FileButton>
+          <Field label="Reporting period"><TextInput value={period} onChange={setPeriod} style={{ width: 150 }} placeholder="Jan 2026" /></Field>
+          <FileButton onFiles={uploadFiles}>Upload Report</FileButton>
         </div>
       )}
 
@@ -129,9 +150,10 @@ export function MonthlyReports({ snapshot, isPm, mutate }: { snapshot: PortalSna
                 <Eyebrow>Call order sections</Eyebrow>
                 {orders.map((o) => {
                   const has = !!rep.sections[o.id];
+                  const callNum = o.id.replace(/^Call\s+/i, '').split('.')[0];
                   return (
                     <button key={o.id} type="button" className={"rail-item" + (co && o.id === co.id ? " active" : "") + (has ? "" : " missing")} onClick={() => setSelectedCall(o.id)}>
-                      <div className="l">{o.id}</div>
+                      <div className="l">{callNum}</div>
                       <div className="s">{has ? o.name : "No section yet"}</div>
                     </button>
                   );
@@ -141,24 +163,44 @@ export function MonthlyReports({ snapshot, isPm, mutate }: { snapshot: PortalSna
                 <div>
                   <div className="section-head">
                     <div>
-                      <div className="t">{sec?.title || `${co.id} — ${co.name}`}</div>
-                      <div className="s">{co.id} · {co.name} · reporting period {rep.period}</div>
+                      <div className="t">{sec?.title || `${co.id.replace(/^Call\s+/i, '').split('.')[0]} — ${co.name}`}</div>
+                      <div className="s">{co.id.replace(/^Call\s+/i, '').split('.')[0]} · {co.name} · reporting period {rep.period}</div>
                     </div>
                     {isPm && <Button onClick={() => setSf(formFor(sec, co))}>{sec ? "Edit section" : "Add section for this call order"}</Button>}
                   </div>
 
                   {sf && (
                     <div className="sf-card">
-                      <div className="form-head">{(sec ? "Edit" : "Add") + " section — " + co.id}</div>
+                      <div className="form-head">{(sec ? "Edit" : "Add") + " section — " + co.id.replace(/^Call\s+/i, '').split('.')[0]}</div>
                       <div className="form-body">
                         <div>
                           <Eyebrow>Funding information</Eyebrow>
                           <div className="five-col" style={{ marginTop: 8 }}>
-                            <Field label="Obligated" plain><TextInput small value={sf.obligated} onChange={set("obligated")} /></Field>
-                            <Field label="Expended" plain><TextInput small value={sf.expended} onChange={set("expended")} /></Field>
-                            <Field label="Remaining" plain><TextInput small value={sf.remaining} onChange={set("remaining")} /></Field>
-                            <Field label="EAC" plain><TextInput small value={sf.eac} onChange={set("eac")} /></Field>
-                            <Field label="Over / under" plain><TextInput small value={sf.over} onChange={set("over")} /></Field>
+                            <Field label="Obligated" plain><TextInput small value={sf.obligated} onChange={(val) => {
+                              const num = val.replace(/[^0-9.-]/g, '');
+                              const formatted = num && !isNaN(parseFloat(num)) ? formatCurrency(parseFloat(num)) : '';
+                              set('obligated')(formatted);
+                            }} placeholder="$0" /></Field>
+                            <Field label="Expended" plain><TextInput small value={sf.expended} onChange={(val) => {
+                              const num = val.replace(/[^0-9.-]/g, '');
+                              const formatted = num && !isNaN(parseFloat(num)) ? formatCurrency(parseFloat(num)) : '';
+                              set('expended')(formatted);
+                            }} placeholder="$0" /></Field>
+                            <Field label="Remaining" plain><TextInput small value={sf.remaining} onChange={(val) => {
+                              const num = val.replace(/[^0-9.-]/g, '');
+                              const formatted = num && !isNaN(parseFloat(num)) ? formatCurrency(parseFloat(num)) : '';
+                              set('remaining')(formatted);
+                            }} placeholder="$0" /></Field>
+                            <Field label="EAC" plain><TextInput small value={sf.eac} onChange={(val) => {
+                              const num = val.replace(/[^0-9.-]/g, '');
+                              const formatted = num && !isNaN(parseFloat(num)) ? formatCurrency(parseFloat(num)) : '';
+                              set('eac')(formatted);
+                            }} placeholder="$0" /></Field>
+                            <Field label="Over / under" plain><TextInput small value={sf.over} onChange={(val) => {
+                              const num = val.replace(/[^0-9.-]/g, '');
+                              const formatted = num && !isNaN(parseFloat(num)) ? formatCurrency(parseFloat(num)) : '';
+                              set('over')(formatted);
+                            }} placeholder="$0" /></Field>
                           </div>
                         </div>
                         <div className="two-col">

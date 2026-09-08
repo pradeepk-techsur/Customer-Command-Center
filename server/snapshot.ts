@@ -1,4 +1,4 @@
-import type { Queryable } from "./db.ts";
+import type { Queryable, getAccessibleCallOrders } from "./db.ts";
 import type { CallOrder, MonthlyReport, MsrSection, PortalSnapshot, ReportGroup, WeeklyReport } from "../shared/types.ts";
 import { todayIso } from "./dates.ts";
 
@@ -11,15 +11,94 @@ export function config() {
   };
 }
 
-export async function buildSnapshot(db: Queryable): Promise<PortalSnapshot> {
-  const [orders, lcats, staff, weekly, items, monthly, sections] = await Promise.all([
-    db.query("select * from call_orders order by sort_order, created_at"),
-    db.query("select * from labor_categories order by call_order_id, sort_order, id"),
-    db.query("select * from staff order by call_order_id, sort_order, id"),
-    db.query("select * from weekly_reports order by week_ending desc nulls last, created_at desc"),
-    db.query("select * from weekly_report_items order by weekly_report_id, sort_order, id"),
-    db.query("select * from monthly_reports order by period_start desc nulls last, created_at desc"),
-    db.query("select * from msr_sections order by id"),
+/**
+ * Build portal snapshot with user-based access filtering.
+ * @param db - Database pool or client
+ * @param userId - Optional user ID for access filtering
+ * @param userRole - Optional user role for access filtering
+ * @returns PortalSnapshot filtered to user's accessible call orders
+ */
+export async function buildSnapshot(
+  db: Queryable, 
+  userId?: number, 
+  userRole?: string
+): Promise<PortalSnapshot> {
+  // Get accessible call orders for this user
+  let accessibleCallOrders: string[] | null = null;
+  if (userId && userRole) {
+    const { getAccessibleCallOrders } = await import("./db.ts");
+    accessibleCallOrders = await getAccessibleCallOrders(db, userId, userRole);
+  }
+
+  // Build WHERE clause for call order filtering
+  let callOrderFilter = "";
+  let callOrderParams: any[] = [];
+  
+  if (accessibleCallOrders !== null) {
+    if (accessibleCallOrders.length === 0) {
+      // User has no accessible call orders - return empty snapshot
+      const actor = userId && userRole ? { id: userId, email: '', role: userRole as any } : undefined;
+      return { 
+        today: todayIso(), 
+        config: config(), 
+        contract: CONTRACT, 
+        callOrders: [], 
+        monthlyReports: [],
+        actor
+      };
+    }
+    // Filter to accessible call orders
+    callOrderFilter = `where id = ANY($1)`;
+    callOrderParams = [accessibleCallOrders];
+  }
+
+  // Query call orders with access filter
+  const ordersQuery = accessibleCallOrders !== null
+    ? `select * from call_orders ${callOrderFilter} order by sort_order, created_at`
+    : `select * from call_orders order by sort_order, created_at`;
+
+  const orders = await db.query(ordersQuery, callOrderParams);
+
+  // If no call orders accessible, return empty snapshot
+  if (orders.rows.length === 0) {
+    const actor = userId && userRole ? { id: userId, email: '', role: userRole as any } : undefined;
+    return { 
+      today: todayIso(), 
+      config: config(), 
+      contract: CONTRACT, 
+      callOrders: [], 
+      monthlyReports: [],
+      actor
+    };
+  }
+
+  // Get call order IDs for filtering related data
+  const callOrderIds = orders.rows.map((o: any) => o.id);
+
+  // Build monthly reports query based on role
+  let monthlyQuery = "select * from monthly_reports where ";
+  let monthlyParams: any[] = [];
+  
+  if (userRole === 'customer') {
+    // Customers only see reports that have been released to them
+    monthlyQuery += "customer_visible = true and report_type = 'program' order by period_start desc nulls last, created_at desc";
+  } else if (userRole === 'pm') {
+    // PMs see their own PM reports + program reports (not released-only)
+    monthlyQuery += "(report_type = 'pm' and created_by_user_id = $1) or report_type = 'program' order by period_start desc nulls last, created_at desc";
+    monthlyParams.push(userId);
+  } else {
+    // Program managers and admins see all reports
+    monthlyQuery += "true order by period_start desc nulls last, created_at desc";
+  }
+
+  // Query related data, filtered to accessible call orders
+  const [lcats, staff, weekly, items, monthly, sections] = await Promise.all([
+    db.query("select * from labor_categories where call_order_id = ANY($1) order by call_order_id, sort_order, id", [callOrderIds]),
+    db.query("select * from staff where call_order_id = ANY($1) order by call_order_id, sort_order, id", [callOrderIds]),
+    db.query("select * from weekly_reports where call_order_id is null or call_order_id = ANY($1) order by week_ending desc nulls last, created_at desc", [callOrderIds]),
+    db.query("select * from weekly_report_items where call_order_id = ANY($1) order by weekly_report_id, sort_order, id", [callOrderIds]),
+    db.query(monthlyQuery, monthlyParams),
+    db.query("select * from msr_sections where call_order_id = ANY($1) order by id", [callOrderIds]),
   ]);
 
   const itemsByReport = new Map<number, typeof items.rows>();
@@ -51,7 +130,12 @@ export async function buildSnapshot(db: Queryable): Promise<PortalSnapshot> {
       reports.push({
         id: w.id, callOrderId: w.call_order_id, weekEnding: w.week_ending, weekLabel: w.week_label,
         file: w.file_name, submittedBy: w.submitted_by, status: w.status, href: w.href,
-        createdInPortal: w.created_in_portal, groups,
+        createdInPortal: w.created_in_portal, 
+        statusV2: w.status_v2 || 'draft',
+        createdByUserId: w.created_by_user_id || null,
+        submittedAt: w.submitted_at || null,
+        lastEditedAt: w.last_edited_at || null,
+        groups,
       });
     }
     return {
@@ -74,9 +158,19 @@ export async function buildSnapshot(db: Queryable): Promise<PortalSnapshot> {
     }
     return {
       id: m.id, period: m.period, periodStart: m.period_start, file: m.file_name, submittedBy: m.submitted_by,
-      dueOn: m.due_on, status: m.status, href: m.href, scope: m.scope, sections: secs,
+      dueOn: m.due_on, status: m.status, href: m.href, scope: m.scope,
+      createdByUserId: m.created_by_user_id || null,
+      reportType: m.report_type || 'program',
+      parentReportId: m.parent_report_id || null,
+      customerVisible: m.customer_visible || false,
+      customerReleasedAt: m.customer_released_at || null,
+      customerReleasedBy: m.customer_released_by || null,
+      sections: secs,
     };
   });
 
-  return { today: todayIso(), config: config(), contract: CONTRACT, callOrders, monthlyReports };
+  // Include actor information if user is authenticated
+  const actor = userId && userRole ? { id: userId, email: '', role: userRole as any } : undefined;
+  
+  return { today: todayIso(), config: config(), contract: CONTRACT, callOrders, monthlyReports, actor };
 }

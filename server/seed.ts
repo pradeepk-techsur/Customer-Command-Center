@@ -4,6 +4,7 @@ import { pool, withTransaction } from "./db.ts";
 import { migrate } from "./migrate.ts";
 import { DATA, WEEKLY_REPORTS, MONTHLY_REPORTS } from "./seed-data.ts";
 import { parsePop, toIsoDate, firstOfMonth } from "./dates.ts";
+import { hashPassword } from "./auth-service.ts";
 
 const DEFAULT_STAMPS = { fin: "2026-08-31", people: "2026-09-02" };
 
@@ -11,6 +12,34 @@ export async function seed() {
   await migrate();
   await withTransaction(async (db) => {
     await db.query("truncate msr_sections, monthly_reports, weekly_report_items, weekly_reports, staff, labor_categories, call_orders restart identity cascade");
+    
+    // Seed test users with password "Password123!"
+    const testPassword = await hashPassword("Password123!");
+    const testUsers = [
+      // Customers
+      { email: "john.smith@acme.com", name: "John Smith", role: "customer" },
+      { email: "jane.doe@example.com", name: "Jane Doe", role: "customer" },
+      { email: "mike.wilson@demo.org", name: "Mike Wilson", role: "customer" },
+      { email: "sarah.miller@test.com", name: "Sarah Miller", role: "customer" },
+      { email: "robert.taylor@sample.net", name: "Robert Taylor", role: "customer" },
+      // Program Managers (full access)
+      { email: "ceenil.kaur@techsur.com", name: "Ceenil Kaur", role: "program_manager" },
+      { email: "lauryn.brown@techsur.com", name: "Lauryn Brown", role: "program_manager" },
+      // Project Managers (assigned call orders only)
+      { email: "alex.johnson@techsur.com", name: "Alex Johnson", role: "pm" },
+      { email: "maria.garcia@techsur.com", name: "Maria Garcia", role: "pm" },
+      // Admin
+      { email: "admin@techsur.com", name: "Admin User", role: "admin" },
+    ];
+
+    for (const user of testUsers) {
+      await db.query(
+        `insert into users (email, password_hash, name, role, auth_provider, status, created_at, updated_at)
+         values ($1, $2, $3, $4, 'email', 'active', now(), now())
+         on conflict (email) do nothing`,
+        [user.email, testPassword, user.name, user.role]
+      );
+    }
 
     for (const [i, c] of DATA.entries()) {
       const { start, end } = parsePop(c.pop);
@@ -72,11 +101,81 @@ export async function seed() {
         );
       }
     }
+    
+    // Seed test call order assignments for customers
+    // Assign john.smith@acme.com to Call 002 (JDCN/Oracle Financials Cloud) and Call 003 (USCIS/ELIS/Modernization)
+    // Assign jane.doe@example.com to Call 002 only
+    const { rows: johnRows } = await db.query("select id from users where email = 'john.smith@acme.com'");
+    const { rows: janeRows } = await db.query("select id from users where email = 'jane.doe@example.com'");
+    
+    if (johnRows.length > 0) {
+      const johnId = johnRows[0].id;
+      // Get first two non-pending call orders
+      const { rows: callOrders } = await db.query("select id from call_orders where not pending order by sort_order limit 2");
+      for (const co of callOrders) {
+        await db.query(
+          "insert into user_call_orders (user_id, call_order_id) values ($1, $2) on conflict do nothing",
+          [johnId, co.id]
+        );
+      }
+    }
+    
+    if (janeRows.length > 0) {
+      const janeId = janeRows[0].id;
+      // Get first call order
+      const { rows: callOrders } = await db.query("select id from call_orders where not pending order by sort_order limit 1");
+      if (callOrders.length > 0) {
+        await db.query(
+          "insert into user_call_orders (user_id, call_order_id) values ($1, $2) on conflict do nothing",
+          [janeId, callOrders[0].id]
+        );
+      }
+    }
+    
+    // Seed test call order assignments for Project Managers
+    // Assign alex.johnson@techsur.com to Call 002 and Call 003
+    // Assign maria.garcia@techsur.com to Call 001
+    const { rows: alexRows } = await db.query("select id from users where email = 'alex.johnson@techsur.com'");
+    const { rows: mariaRows } = await db.query("select id from users where email = 'maria.garcia@techsur.com'");
+    
+    if (alexRows.length > 0) {
+      const alexId = alexRows[0].id;
+      const { rows: callOrders } = await db.query("select id from call_orders where not pending order by sort_order offset 1 limit 2");
+      for (const co of callOrders) {
+        await db.query(
+          "insert into user_call_orders (user_id, call_order_id) values ($1, $2) on conflict do nothing",
+          [alexId, co.id]
+        );
+      }
+    }
+    
+    if (mariaRows.length > 0) {
+      const mariaId = mariaRows[0].id;
+      // Get first call order only
+      const { rows: callOrders } = await db.query("select id from call_orders where not pending order by sort_order limit 1");
+      if (callOrders.length > 0) {
+        await db.query(
+          "insert into user_call_orders (user_id, call_order_id) values ($1, $2) on conflict do nothing",
+          [mariaId, callOrders[0].id]
+        );
+      }
+    }
   });
 }
 
 if (process.argv[1] && process.argv[1].endsWith("seed.ts")) {
   seed()
-    .then(() => { console.log("Seeded " + DATA.length + " funded periods, " + MONTHLY_REPORTS.length + " monthly report(s)."); return pool.end(); })
+    .then(() => { 
+      console.log("Seeded " + DATA.length + " funded periods, " + MONTHLY_REPORTS.length + " monthly report(s), and 10 test users."); 
+      console.log("\nTest user credentials (password for all users: Password123!):");
+      console.log("  Customers:");
+      console.log("    - john.smith@acme.com (assigned to 2 call orders)");
+      console.log("    - jane.doe@example.com (assigned to 1 call order)");
+      console.log("    - mike.wilson@demo.org, sarah.miller@test.com, robert.taylor@sample.net (no assignments)");
+      console.log("  Program Managers: ceenil.kaur@techsur.com, lauryn.brown@techsur.com (full access, can manage MSRs)");
+      console.log("  Project Managers: alex.johnson@techsur.com (assigned to 2 call orders), maria.garcia@techsur.com (assigned to 1 call order)");
+      console.log("  Admin: admin@techsur.com (full access)");
+      return pool.end(); 
+    })
     .catch((err) => { console.error(err); process.exit(1); });
 }

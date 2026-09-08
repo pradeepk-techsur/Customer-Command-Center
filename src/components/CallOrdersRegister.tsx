@@ -1,6 +1,6 @@
 import type { CallOrder, PortalSnapshot } from "../../shared/types.ts";
 import { useSort } from "../hooks/useSort.ts";
-import { burnColor, dateLabel, filled, isVacant, localDate, mostOverdueStamp, pctOf, periodState, usd } from "../lib/format.ts";
+import { burnColor, dateLabel, filled, isVacant, localDate, mostOverdueStamp, pctOf, periodState, usd, usdFull } from "../lib/format.ts";
 import { Eyebrow, FileButton, SortHeaders } from "./ui.tsx";
 import type { Tab } from "./CallOrderDetail.tsx";
 
@@ -71,8 +71,9 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onUpload }: {
           const c = g.current;
           const pct = pctOf(c.spend, c.funded);
           const stamp = mostOverdueStamp(c, today, config);
+          const callNum = c.id.replace(/^Call\s+/i, '').split('.')[0];
           const idLine = c.pending ? `${g.key} · pending setup`
-            : g.periods.length > 1 ? `${g.key} · ${c.id} · ${g.periods.length} periods` : `${g.key} · ${c.id}`;
+            : g.periods.length > 1 ? `${g.key} · ${callNum} · ${g.periods.length} periods` : `${g.key} · ${callNum}`;
           const burning = c.funded > 0 && c.spend > 0;
           return (
             <div key={g.key} className="grid trow clickable register-cols" onClick={() => onOpen(c.id, "Financials")}>
@@ -84,9 +85,9 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onUpload }: {
               <button type="button" className="people-link num" onClick={(e) => { e.stopPropagation(); onOpen(c.id, "People"); }}>
                 {c.staff.length ? filled(c) : "—"}
               </button>
-              <div className="num right">{c.funded ? usd(c.funded) : "—"}</div>
+              <div className="num right">{c.funded ? usdFull(c.funded) : "—"}</div>
               <div className="right">
-                <div className="num">{c.funded ? usd(c.spend) : "—"}</div>
+                <div className="num">{c.funded ? usdFull(c.spend) : "—"}</div>
                 <div className="burn-track"><div className="burn-fill" style={{ width: Math.min(pct, 100) + "%", background: burnColor(pct) }} /></div>
                 <div className="burn-pct" style={{ color: burning ? burnColor(pct) : "var(--label)" }}>
                   {c.funded ? (c.spend ? pct + "% expended" : "not yet started") : "awaiting funding data"}

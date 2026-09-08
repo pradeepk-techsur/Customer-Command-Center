@@ -8,12 +8,23 @@ import { WeeklyReportsTab } from "./WeeklyReportsTab.tsx";
 import type { Mutate } from "../App.tsx";
 
 export type Tab = "Financials" | "People" | "Weekly Status Reports";
-const TABS: Tab[] = ["Financials", "People", "Weekly Status Reports"];
 
-export function CallOrderDetail({ snapshot, order: c, tab, isPm, onBack, onTab, onSelectPeriod, mutate }: {
-  snapshot: PortalSnapshot; order: CallOrder; tab: Tab; isPm: boolean;
+// Only Project Managers get Weekly Reports tab in call orders
+// Program Managers, Admins, and Customers use top navigation tabs
+function getTabs(role: string): Tab[] {
+  const baseTabs: Tab[] = ["Financials", "People"];
+  if (role === "pm") {
+    baseTabs.push("Weekly Status Reports");
+  }
+  return baseTabs;
+}
+
+export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBack, onTab, onSelectPeriod, mutate }: {
+  snapshot: PortalSnapshot; order: CallOrder; tab: Tab; isPm: boolean; userName?: string;
   onBack: () => void; onTab: (t: Tab) => void; onSelectPeriod: (id: string) => void; mutate: Mutate;
 }) {
+  const role = snapshot.actor?.role || "customer";
+  const TABS = getTabs(role);
   const { today } = snapshot;
   const group = groupCallOrders(snapshot.callOrders, today).find((g) => g.periods.some((p) => p.id === c.id));
   const staffCount = c.staff.length ? filled(c) : "—";
@@ -24,7 +35,7 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, onBack, onTab, 
 
       <div className="detail-head">
         <div>
-          <div className="detail-id">{c.groupKey} · {c.id}</div>
+          <div className="detail-id">{c.groupKey} · {c.id.replace(/^Call\s+/i, '').split('.')[0]}</div>
           <h1 style={{ marginBottom: 8 }}>{c.groupName}</h1>
           <div className="page-sub">Period of performance {c.pop} · {periodState(c, today)} period · PM {c.pm}</div>
         </div>
@@ -55,7 +66,7 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, onBack, onTab, 
 
       {tab === "Financials" && <FinancialsTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} />}
       {tab === "People" && <PeopleTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} />}
-      {tab === "Weekly Status Reports" && <WeeklyReportsTab order={c} isPm={isPm} mutate={mutate} />}
+      {tab === "Weekly Status Reports" && <WeeklyReportsTab order={c} isPm={isPm} userName={userName} mutate={mutate} />}
     </div>
   );
 }

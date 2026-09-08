@@ -13,8 +13,22 @@ const LCAT_COLS = [
 ];
 
 export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: CallOrder; snapshot: PortalSnapshot; isPm: boolean; mutate: Mutate }) {
-  const [draft, setDraft] = useState(String(c.spend));
-  useEffect(() => { setDraft(String(c.spend)); }, [c.id, c.spend]);
+  const [draft, setDraft] = useState(c.spend.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }));
+  useEffect(() => { 
+    setDraft(c.spend.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })); 
+  }, [c.id, c.spend]);
+  
+  const handleSpendChange = (val: string) => {
+    // Allow typing numbers and format as currency
+    const numericValue = val.replace(/[^0-9]/g, '');
+    const formatted = numericValue ? parseInt(numericValue).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '';
+    setDraft(formatted);
+  };
+  
+  const saveDraft = () => {
+    const numericValue = draft.replace(/[^0-9]/g, '');
+    mutate(() => api.saveSpend(c.id, numericValue));
+  };
 
   const remaining = c.funded - c.spend;
   const pct = pctOf(c.spend, c.funded);
@@ -45,9 +59,9 @@ export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: Cal
         {isPm && (
           <div className="fin-edit">
             <Field label="Update funds expended to date" style={{ flex: 1 }}>
-              <TextInput value={draft} onChange={setDraft} />
+              <TextInput value={draft} onChange={handleSpendChange} placeholder="$0" />
             </Field>
-            <Button primary onClick={() => mutate(() => api.saveSpend(c.id, draft))}>Save</Button>
+            <Button primary onClick={saveDraft}>Save</Button>
           </div>
         )}
         {funding.map((r) => (
