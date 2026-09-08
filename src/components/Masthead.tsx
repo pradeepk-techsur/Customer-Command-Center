@@ -33,7 +33,7 @@ export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
             <button type="button" className={"nav-tab" + (page === "msr" ? " active" : "")} onClick={() => onPage("msr")}>Monthly Status Reports</button>
           )}
           {canAccessAdmin && (
-            <button type="button" className={"nav-tab" + (page === "admin" ? " active" : "")} onClick={() => onPage("admin")}>{isProgramManager ? "Manage Customers" : "Admin"}</button>
+            <button type="button" className={"nav-tab" + (page === "admin" ? " active" : "")} onClick={() => onPage("admin")}>{isProgramManager ? "Manage Users" : "Admin"}</button>
           )}
         </nav>
         {userName && onLogout && (
