@@ -49,9 +49,9 @@ router.get("/users", requireAdminOrProgramManager, async (req, res) => {
     const params: any[] = [];
     let paramIndex = 1;
 
-    // Program Managers can only see customers
+    // Program Managers can only see customers and pms
     if (isProgramManager) {
-      query += ` AND role = 'customer'`;
+      query += ` AND role IN ('customer', 'pm')`;
     }
 
     if (role && !isProgramManager) {
@@ -140,11 +140,11 @@ router.post("/users", requireAdminOrProgramManager, createUserLimiter, async (re
       return;
     }
 
-    // Program Managers can only create customers
-    if (isProgramManager && role !== "customer") {
+    // Program Managers can only create customers and pms
+    if (isProgramManager && role !== "customer" && role !== "pm") {
       res.status(403).json({
         error: "Insufficient permissions",
-        message: "Program Managers can only create customer accounts",
+        message: "Program Managers can only create customer and project manager accounts",
       });
       return;
     }
@@ -158,10 +158,15 @@ router.post("/users", requireAdminOrProgramManager, createUserLimiter, async (re
       return;
     }
 
-    // Default to email auth for customers created by program managers
-    const finalAuthProvider = auth_provider || (isProgramManager ? "email" : undefined);
+    // Determine auth provider based on role
+    let finalAuthProvider = auth_provider;
     
-    if (!finalAuthProvider) {
+    if (isProgramManager) {
+      // Program Managers creating users:
+      // - Customers: email auth with temp password
+      // - PMs: Microsoft SSO (no password)
+      finalAuthProvider = role === "customer" ? "email" : "microsoft";
+    } else if (!finalAuthProvider) {
       res.status(400).json({
         error: "Missing auth provider",
         message: "Auth provider is required",
@@ -178,13 +183,13 @@ router.post("/users", requireAdminOrProgramManager, createUserLimiter, async (re
       return;
     }
 
-    // Handle password: generate temporary for PM-created customers, or use provided password
+    // Handle password: only needed for email auth
     let passwordHash = null;
     let temporaryPassword: string | null = null;
     let mustResetPassword = false;
 
     if (finalAuthProvider === "email") {
-      if (isProgramManager) {
+      if (isProgramManager && role === "customer") {
         // Generate temporary password for customers created by program managers
         temporaryPassword = crypto.randomBytes(8).toString("base64").slice(0, 12) + "!Aa1";
         passwordHash = await hashPassword(temporaryPassword);

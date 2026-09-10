@@ -262,34 +262,42 @@ export function UserForm({ user, onSave, onCancel, isProgramManager = false }: U
               )}
             </div>
 
-            {!isProgramManager && (
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontSize: "13px", fontWeight: 500 }}>
-                  Role *
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => handleRoleChange(e.target.value)}
-                  required
-                  disabled={loading}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    border: "1px solid var(--line-input)",
-                    borderRadius: "3px",
-                    fontSize: "13px",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  <option value="customer">Customer</option>
-                  <option value="pm">Project Manager</option>
-                  <option value="program_manager">Program Manager</option>
-                  <option value="admin">Administrator</option>
-                </select>
-              </div>
-            )}
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ display: "block", marginBottom: "8px", fontSize: "13px", fontWeight: 500 }}>
+                Role *
+              </label>
+              <select
+                value={formData.role}
+                onChange={(e) => handleRoleChange(e.target.value)}
+                required
+                disabled={loading || isEdit}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  border: "1px solid var(--line-input)",
+                  borderRadius: "3px",
+                  fontSize: "13px",
+                  boxSizing: "border-box",
+                  background: isEdit ? "var(--surface-2)" : "white",
+                }}
+              >
+                <option value="customer">Customer</option>
+                <option value="pm">Project Manager</option>
+                {!isProgramManager && (
+                  <>
+                    <option value="program_manager">Program Manager</option>
+                    <option value="admin">Administrator</option>
+                  </>
+                )}
+              </select>
+              {isEdit && (
+                <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
+                  Role cannot be changed
+                </div>
+              )}
+            </div>
 
-            {isProgramManager && (
+            {isProgramManager && !isEdit && formData.role === "customer" && (
               <div style={{
                 padding: "12px",
                 background: "#e8f4fd",
@@ -301,6 +309,22 @@ export function UserForm({ user, onSave, onCancel, isProgramManager = false }: U
                 <strong>Creating Customer Account</strong>
                 <div style={{ marginTop: "4px", color: "var(--muted)" }}>
                   A temporary password will be generated. The customer must change it on first login.
+                </div>
+              </div>
+            )}
+
+            {isProgramManager && !isEdit && formData.role === "pm" && (
+              <div style={{
+                padding: "12px",
+                background: "#fff3cd",
+                border: "1px solid #ffc107",
+                borderRadius: "4px",
+                marginBottom: "20px",
+                fontSize: "13px",
+              }}>
+                <strong>📋 SSO-Based Account</strong>
+                <div style={{ marginTop: "4px", color: "var(--muted)" }}>
+                  Project Managers use Microsoft Single Sign-On (Azure AD). The user will log in with their TechSur email and Microsoft credentials. No password creation needed.
                 </div>
               </div>
             )}

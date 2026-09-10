@@ -95,14 +95,14 @@ export function AdminPage({ role }: { role: Role }) {
       const savedData = await res.json();
       const userId = editingUser?.id || savedData.user.id;
 
-      // Show temporary password if provided (PM creating customer)
+      // Show temporary password if provided (only for customers with email auth)
       if (savedData.temporaryPassword) {
         setTemporaryPassword(savedData.temporaryPassword);
         setTempPasswordEmail(savedData.user.email);
       }
 
-      // Update call order assignments for customers and PMs
-      if ((userData.role === "customer" || userData.role === "pm") && callOrderIds !== undefined && userId) {
+      // Update call order assignments for PMs only (customers have automatic full access)
+      if (userData.role === "pm" && callOrderIds !== undefined && userId) {
         await updateCallOrderAssignments(userId, callOrderIds);
       }
 
@@ -228,8 +228,8 @@ export function AdminPage({ role }: { role: Role }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{isProgramManager ? "Customer Management" : "User Administration"}</h1>
-          <div className="page-sub">{isProgramManager ? "Invite and manage customer accounts" : "Manage portal users and permissions"}</div>
+          <h1>{isProgramManager ? "User Management" : "User Administration"}</h1>
+          <div className="page-sub">{isProgramManager ? "Manage customer and project manager accounts" : "Manage portal users and permissions"}</div>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {canViewAudit && (
