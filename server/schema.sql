@@ -161,6 +161,66 @@ begin
   end if;
 end $$;
 
+-- Add snapshot references to audit_log
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns 
+    where table_name = 'audit_log' and column_name = 'snapshot_id'
+  ) then
+    alter table audit_log add column snapshot_id bigint;
+    alter table audit_log add column snapshot_type text check (snapshot_type in ('call_order', 'staff'));
+  end if;
+end $$;
+
+-- ============================================================================
+-- Audit History & Snapshots
+-- ============================================================================
+
+-- Call order snapshots: capture full financial state at each change
+create table if not exists call_order_snapshots (
+  id                bigserial primary key,
+  call_order_id     text not null references call_orders(id) on delete cascade,
+  snapshot_time     timestamptz not null default now(),
+  -- Financial data
+  funded            numeric(14,2) not null,
+  spend             numeric(14,2) not null,
+  eac               numeric(14,2),
+  over_under        numeric(14,2),
+  -- Metadata
+  pm                text not null,
+  pop_start         date,
+  pop_end           date,
+  pop_label         text not null,
+  pending           boolean not null,
+  -- Audit trail
+  created_by_user_id integer references users(id),
+  change_reason      text,
+  changed_fields     jsonb,  -- Array of field names that changed
+  created_at        timestamptz not null default now()
+);
+create index if not exists call_order_snapshots_call_order_idx on call_order_snapshots(call_order_id, snapshot_time desc);
+create index if not exists call_order_snapshots_time_idx on call_order_snapshots(snapshot_time desc);
+create index if not exists call_order_snapshots_user_idx on call_order_snapshots(created_by_user_id);
+
+-- Staff snapshots: capture full roster state at each change
+create table if not exists staff_snapshots (
+  id                bigserial primary key,
+  call_order_id     text not null references call_orders(id) on delete cascade,
+  snapshot_time     timestamptz not null default now(),
+  -- Staff roster as JSONB array: [{id, name, labor_category, rate, status, sort_order}]
+  staff_roster      jsonb not null default '[]'::jsonb,
+  -- Audit trail
+  created_by_user_id integer references users(id),
+  change_reason      text,
+  change_type        text,  -- 'add' | 'update' | 'delete'
+  changed_staff_id   integer,  -- ID of staff member that changed
+  created_at        timestamptz not null default now()
+);
+create index if not exists staff_snapshots_call_order_idx on staff_snapshots(call_order_id, snapshot_time desc);
+create index if not exists staff_snapshots_time_idx on staff_snapshots(snapshot_time desc);
+create index if not exists staff_snapshots_user_idx on staff_snapshots(created_by_user_id);
+
 -- ============================================================================
 -- Authentication & User Management
 -- ============================================================================

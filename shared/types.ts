@@ -172,3 +172,73 @@ export interface MsrSectionInput {
 export const STATUS_OPTIONS = [
   "Assigned", "Vacant", "On leave", "PIV pending", "Onboarding", "Recruiting", "Offboarded", "No longer available",
 ];
+
+// ============================================================================
+// Audit History & Snapshots
+// ============================================================================
+
+export interface CallOrderSnapshot {
+  id: number;
+  callOrderId: string;
+  snapshotTime: string;  // ISO timestamp
+  // Financial data
+  funded: number;
+  spend: number;
+  eac: number | null;
+  overUnder: number | null;
+  // Metadata
+  pm: string;
+  popStart: string | null;
+  popEnd: string | null;
+  popLabel: string;
+  pending: boolean;
+  // Audit trail
+  createdByUserId: number | null;
+  createdByUserName?: string;  // Joined from users table
+  changeReason: string | null;
+  changedFields: string[] | null;
+  createdAt: string;  // ISO timestamp
+}
+
+export interface StaffSnapshot {
+  id: number;
+  callOrderId: string;
+  snapshotTime: string;  // ISO timestamp
+  // Staff roster
+  staffRoster: StaffMember[];
+  // Audit trail
+  createdByUserId: number | null;
+  createdByUserName?: string;  // Joined from users table
+  changeReason: string | null;
+  changeType: 'add' | 'update' | 'delete' | null;
+  changedStaffId: number | null;
+  createdAt: string;  // ISO timestamp
+}
+
+export interface AuditLogEntry {
+  id: number;
+  actor: string;
+  role: string;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  details: any;
+  occurredAt: string;  // ISO timestamp
+  userId: number | null;
+  snapshotId: number | null;
+  snapshotType: 'call_order' | 'staff' | null;
+}
+
+export interface HistoryTimelineEntry {
+  date: string;  // ISO date
+  time: string;  // ISO timestamp
+  changeType: 'financial' | 'staff' | 'metadata';
+  description: string;
+  // Role-based fields (null for customers)
+  changedBy?: string | null;  // User name
+  reason?: string | null;
+  // Change details
+  beforeValue?: any;
+  afterValue?: any;
+  field?: string;
+}

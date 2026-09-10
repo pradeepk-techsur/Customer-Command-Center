@@ -5,17 +5,20 @@ import { groupCallOrders } from "./CallOrdersRegister.tsx";
 import { FinancialsTab } from "./FinancialsTab.tsx";
 import { PeopleTab } from "./PeopleTab.tsx";
 import { WeeklyReportsTab } from "./WeeklyReportsTab.tsx";
+import { CallOrderHistory } from "./CallOrderHistory.tsx";
 import type { Mutate } from "../App.tsx";
 
-export type Tab = "Financials" | "People" | "Weekly Status Reports";
+export type Tab = "Financials" | "People" | "Weekly Status Reports" | "History";
 
 // Only Project Managers get Weekly Reports tab in call orders
 // Program Managers, Admins, and Customers use top navigation tabs
+// History tab is available to all roles
 function getTabs(role: string): Tab[] {
   const baseTabs: Tab[] = ["Financials", "People"];
   if (role === "pm") {
     baseTabs.push("Weekly Status Reports");
   }
+  baseTabs.push("History");
   return baseTabs;
 }
 
@@ -67,6 +70,7 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBac
       {tab === "Financials" && <FinancialsTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} />}
       {tab === "People" && <PeopleTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} />}
       {tab === "Weekly Status Reports" && <WeeklyReportsTab order={c} isPm={isPm} userName={userName} mutate={mutate} />}
+      {tab === "History" && <CallOrderHistory callOrderId={c.id} userRole={snapshot.actor?.role || 'customer'} />}
     </div>
   );
 }

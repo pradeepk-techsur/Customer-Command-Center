@@ -48,6 +48,43 @@ npm run dev                     # Start both servers
 
 **Production:** `npm run build` then `npm start` serves the API and the built client from one process.
 
+## Key Features
+
+### Audit System
+
+The portal includes a comprehensive audit system that tracks all changes to call orders and staff rosters:
+
+- **Full history timeline** - View all financial and staffing changes chronologically
+- **Point-in-time queries** - See call order state at any past date
+- **Comparison mode** - Compare states between two dates
+- **Role-based visibility**:
+  - Customers see WHAT/WHEN changed (no user attribution)
+  - Internal users see full audit trail with WHO/WHAT/WHEN/WHY
+- **Recent changes widget** - Dashboard view of last 20 changes
+- **Admin audit log** - Full system audit with filters and CSV export
+
+See [AUDIT-SYSTEM.md](./AUDIT-SYSTEM.md) for complete documentation.
+
+### Call Order Management
+
+- View all call orders with financial and staffing details
+- Track spending, EAC, and budget variance
+- Manage staff roster with labor categories and rates
+- Period of performance tracking
+- Option period navigation
+
+### Reporting
+
+- Weekly status reports (PM only)
+- Monthly status reports
+- Consolidated reporting across all call orders
+
+### Authentication
+
+- Email/password authentication
+- Microsoft Azure AD SSO integration
+- Role-based access control (Customer, PM, Program Manager, Admin)
+
 ## What the portal does
 
 - **Call Orders** — one row per call order with option periods rolled up onto the period that is
@@ -113,8 +150,14 @@ documents are stored under `uploads/` and served at `/uploads/…`.
 | POST | `/api/monthly-reports` | PM — `{ period, mode: "blank" \| "draft" }` |
 | POST | `/api/monthly-reports/upload` | PM — multipart `files`, `period` |
 | PUT | `/api/monthly-reports/:id/sections/:callOrderId` | PM — section content |
-| **Admin & Audit** | | |
+| **Audit & History** | | |
 | GET | `/api/audit` | PM — change history |
+| GET | `/api/call-orders/:id/history` | any — full history timeline (role-filtered) |
+| GET | `/api/call-orders/:id/history/:date` | any — point-in-time snapshot |
+| GET | `/api/call-orders/:id/history/compare?date1=X&date2=Y` | any — compare two dates |
+| GET | `/api/audit/recent-changes?limit=50` | any — recent changes across accessible call orders |
+| GET | `/api/audit/report` | Admin/Program Manager — full audit log with filters |
+| **Admin** | | |
 | GET | `/api/admin/users` | Admin — list all users |
 | POST | `/api/admin/users` | Admin — create user |
 | PUT | `/api/admin/users/:id` | Admin — update user |

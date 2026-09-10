@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { UserList } from "./UserList.tsx";
 import { UserForm } from "./UserForm.tsx";
+import { AuditLogPage } from "./AuditLogPage.tsx";
 import type { Role } from "../../../shared/types.ts";
 
 interface User {
@@ -14,7 +15,10 @@ interface User {
   created_at: string;
 }
 
+type AdminTab = "users" | "audit";
+
 export function AdminPage({ role }: { role: Role }) {
+  const [activeTab, setActiveTab] = useState<AdminTab>("users");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +30,7 @@ export function AdminPage({ role }: { role: Role }) {
   const [tempPasswordEmail, setTempPasswordEmail] = useState("");
   
   const isProgramManager = role === "program_manager";
+  const canViewAudit = role === "admin" || role === "program_manager";
 
   useEffect(() => {
     loadUsers();
@@ -210,6 +215,11 @@ export function AdminPage({ role }: { role: Role }) {
     }
   };
 
+  // Show audit log tab if viewing audit
+  if (activeTab === "audit") {
+    return <AuditLogPage />;
+  }
+
   if (loading) {
     return <div className="loading">Loading users...</div>;
   }
@@ -221,21 +231,41 @@ export function AdminPage({ role }: { role: Role }) {
           <h1>{isProgramManager ? "Customer Management" : "User Administration"}</h1>
           <div className="page-sub">{isProgramManager ? "Invite and manage customer accounts" : "Manage portal users and permissions"}</div>
         </div>
-        <button
-          onClick={handleAddUser}
-          style={{
-            padding: "10px 20px",
-            background: "var(--accent)",
-            color: "white",
-            border: "none",
-            borderRadius: "3px",
-            fontSize: "13px",
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          + {isProgramManager ? "Invite Customer" : "Add User"}
-        </button>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {canViewAudit && (
+            <div className="tabs" style={{ marginBottom: 0 }}>
+              <button
+                type="button"
+                className={activeTab === "users" ? "tab active" : "tab"}
+                onClick={() => setActiveTab("users")}
+              >
+                Users
+              </button>
+              <button
+                type="button"
+                className={activeTab === "audit" ? "tab active" : "tab"}
+                onClick={() => setActiveTab("audit")}
+              >
+                Audit Log
+              </button>
+            </div>
+          )}
+          <button
+            onClick={handleAddUser}
+            style={{
+              padding: "10px 20px",
+              background: "var(--accent)",
+              color: "white",
+              border: "none",
+              borderRadius: "3px",
+              fontSize: "13px",
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            + {isProgramManager ? "Invite Customer" : "Add User"}
+          </button>
+        </div>
       </div>
 
       {error && (

@@ -9,6 +9,7 @@ import { migrate } from "./migrate.ts";
 import { actorOf, requirePm } from "./auth.ts";
 import { authenticateRequest, requireCallOrderAccess, getAccessibleCallOrders, requireProgramManager } from "./auth-middleware.ts";
 import { buildSnapshot } from "./snapshot.ts";
+import { captureCallOrderSnapshot, captureStaffSnapshot } from "./snapshot-history.ts";
 import { dayLabel, firstOfMonth, monthLabel, toIsoDate } from "./dates.ts";
 import type { MsrSectionInput, WeeklyReportInput } from "../shared/types.ts";
 import { WEEKLY_SECTIONS } from "../shared/types.ts";
@@ -128,6 +129,8 @@ app.patch("/api/call-orders/:id/spend", authenticateRequest, requirePm, requireC
   if (!c) return false;
   const spend = num(req.body?.spend);
   if (spend === null || spend < 0) { res.status(400).json({ error: "Funds expended must be a non-negative amount." }); return false; }
+  // Capture snapshot before update
+  await captureCallOrderSnapshot(db, c.id, req.user?.id ?? null, "Spend updated", ["spend"]);
   await db.query("update call_orders set spend = $2, fin_updated_on = current_date where id = $1", [c.id, spend]);
   await audit(db, req, "call_order.spend", "call_order", c.id, { from: c.spend, to: spend });
 }));
@@ -147,6 +150,8 @@ app.post("/api/call-orders/:id/staff", authenticateRequest, requirePm, requireCa
     [c.id, name, laborCategory, rate],
   );
   await db.query("update call_orders set people_updated_on = current_date where id = $1", [c.id]);
+  // Capture staff snapshot after adding person
+  await captureStaffSnapshot(db, c.id, req.user?.id ?? null, 'add', rows[0].id, `Added ${name}`);
   await audit(db, req, "staff.add", "staff", rows[0].id, { callOrderId: c.id, name, laborCategory, rate });
 }));
 
@@ -171,6 +176,8 @@ app.patch("/api/staff/:id", authenticateRequest, requirePm, async (req, res, nex
   if (!s) { res.status(404).json({ error: "Staff record not found." }); return false; }
   const status = String(req.body?.status || "").trim();
   if (!status) { res.status(400).json({ error: "A status is required." }); return false; }
+  // Capture snapshot before update
+  await captureStaffSnapshot(db, s.call_order_id, req.user?.id ?? null, 'update', s.id, `Status changed: ${s.name} from ${s.status} to ${status}`);
   await db.query("update staff set status = $2 where id = $1", [s.id, status]);
   await db.query("update call_orders set people_updated_on = current_date where id = $1", [s.call_order_id]);
   await audit(db, req, "staff.status", "staff", s.id, { callOrderId: s.call_order_id, name: s.name, from: s.status, to: status });
@@ -192,12 +199,134 @@ app.delete("/api/staff/:id", authenticateRequest, requirePm, async (req, res, ne
   }
   next();
 }, mutation(async (db, req, res) => {
+  // Capture snapshot before deletion
+  const staffQuery = await db.query("select * from staff where id = $1", [req.params.id]);
+  const staffToDelete = staffQuery.rows[0];
+  if (staffToDelete) {
+    await captureStaffSnapshot(db, staffToDelete.call_order_id, req.user?.id ?? null, 'delete', staffToDelete.id, `Removed ${staffToDelete.name}`);
+  }
   const { rows } = await db.query("delete from staff where id = $1 returning *", [req.params.id]);
   const s = rows[0];
   if (!s) { res.status(404).json({ error: "Staff record not found." }); return false; }
   await db.query("update call_orders set people_updated_on = current_date where id = $1", [s.call_order_id]);
   await audit(db, req, "staff.remove", "staff", s.id, { callOrderId: s.call_order_id, name: s.name, laborCategory: s.labor_category, status: s.status });
 }));
+
+// ---- Audit History & Snapshots -----------------------------------------------------------------
+
+import { getCallOrderHistory, getStaffHistory, getCallOrderAtDate, compareCallOrderStates, getRecentChanges, getAuditReport } from "./history-queries.ts";
+import { hasCallOrderAccess } from "./auth-middleware.ts";
+
+// Get full history timeline for a call order
+app.get("/api/call-orders/:id/history", authenticateRequest, requireCallOrderAccess, async (req, res) => {
+  const callOrderId = req.params.id as string;
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+  
+  // Role-based filtering: customers don't see user attribution
+  const includeUserInfo = req.user!.role !== 'customer';
+  
+  try {
+    const [coHistory, staffHistory] = await Promise.all([
+      getCallOrderHistory(pool, callOrderId, startDate, endDate, includeUserInfo),
+      getStaffHistory(pool, callOrderId, startDate, endDate, includeUserInfo)
+    ]);
+    
+    res.json({ callOrderHistory: coHistory, staffHistory });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get call order state at a specific date
+app.get("/api/call-orders/:id/history/:date", authenticateRequest, requireCallOrderAccess, async (req, res) => {
+  const callOrderId = req.params.id as string;
+  const targetDate = req.params.date as string;
+  
+  try {
+    const snapshot = await getCallOrderAtDate(pool, callOrderId, targetDate);
+    
+    // Filter user info for customers
+    if (req.user!.role === 'customer' && snapshot) {
+      snapshot.createdByUserName = undefined;
+    }
+    
+    res.json(snapshot);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Compare call order states between two dates
+app.get("/api/call-orders/:id/history/compare", authenticateRequest, requireCallOrderAccess, async (req, res) => {
+  const callOrderId = req.params.id as string;
+  const date1 = req.query.date1 as string;
+  const date2 = req.query.date2 as string;
+  
+  if (!date1 || !date2) {
+    res.status(400).json({ error: "Both date1 and date2 query parameters are required" });
+    return;
+  }
+  
+  try {
+    const comparison = await compareCallOrderStates(pool, callOrderId, date1, date2);
+    
+    // Filter user info for customers
+    if (req.user!.role === 'customer') {
+      if (comparison.before) comparison.before.createdByUserName = undefined;
+      if (comparison.after) comparison.after.createdByUserName = undefined;
+    }
+    
+    res.json(comparison);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get recent changes (for dashboard widget)
+app.get("/api/audit/recent-changes", authenticateRequest, async (req, res) => {
+  const limit = parseInt(req.query.limit as string) || 50;
+  const role = req.user!.role;
+  const userId = req.user!.id;
+  
+  try {
+    // Get accessible call orders for this user
+    const accessibleCallOrders = await getAccessibleCallOrders(pool, userId, role);
+    const callOrderIds = accessibleCallOrders === null ? undefined : accessibleCallOrders;
+    
+    // Role-based filtering
+    const includeUserInfo = role !== 'customer';
+    
+    const changes = await getRecentChanges(pool, limit, callOrderIds, includeUserInfo);
+    res.json(changes);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get full audit report (admin only)
+app.get("/api/audit/report", authenticateRequest, async (req, res) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'program_manager') {
+    res.status(403).json({ error: "Access denied", message: "Only administrators can access audit reports" });
+    return;
+  }
+  
+  const filters = {
+    userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+    startDate: req.query.startDate as string | undefined,
+    endDate: req.query.endDate as string | undefined,
+    action: req.query.action as string | undefined,
+    entity: req.query.entity as string | undefined,
+    entityId: req.query.entityId as string | undefined,
+  };
+  
+  try {
+    const report = await getAuditReport(pool, filters);
+    res.json(report);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ---- Weekly status reports ---------------------------------------------------------------------
 
