@@ -26,11 +26,14 @@ const BCRYPT_ROUNDS = 10; // Standard bcrypt cost factor
 export interface User {
   id: number;
   email: string;
+  password_hash: string | null;
   name: string;
-  role: "customer" | "pm" | "admin";
+  role: "customer" | "pm" | "admin" | "program_manager";
   auth_provider: "email" | "microsoft";
   azure_oid?: string | null;
   status: "active" | "inactive" | "suspended";
+  must_reset_password: boolean;
+  can_lock_reports: boolean;
   last_login_at?: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -115,7 +118,7 @@ export function generateAccessToken(user: User): string {
     role: user.role,
     type: "access",
   };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY as jwt.SignOptions["expiresIn"] });
 }
 
 /**
@@ -130,7 +133,7 @@ export function generateRefreshToken(user: User): string {
     role: user.role,
     type: "refresh",
   };
-  return jwt.sign(payload, SESSION_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  return jwt.sign(payload, SESSION_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY as jwt.SignOptions["expiresIn"] });
 }
 
 /**
@@ -270,6 +273,98 @@ export async function createPasswordResetToken(userId: number): Promise<string> 
   );
   
   return token;
+}
+
+// ============================================================================
+// Authentication Event Logging (spec §19.4). Never exposed to customer-role users.
+// ============================================================================
+
+export type AuthEventType =
+  | "magic_link_requested" | "magic_link_approved" | "magic_link_rejected"
+  | "magic_link_issued" | "magic_link_used" | "magic_link_reuse_attempt"
+  | "magic_link_expired_attempt" | "magic_link_invalid_attempt"
+  | "sso_success" | "sso_failure" | "session_start" | "session_end";
+
+export async function logAuthEvent(event: {
+  eventType: AuthEventType;
+  email?: string | null;
+  userId?: number | null;
+  roleAssigned?: string | null;
+  ipAddress?: string | null;
+  details?: unknown;
+}): Promise<void> {
+  await pool.query(
+    `insert into authentication_events (event_type, email, user_id, role_assigned, ip_address, details)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [
+      event.eventType,
+      event.email ?? null,
+      event.userId ?? null,
+      event.roleAssigned ?? null,
+      event.ipAddress ?? null,
+      event.details === undefined ? null : JSON.stringify(event.details),
+    ]
+  );
+}
+
+// ============================================================================
+// Magic-Link Authentication (Mission Control Slice 1, spec §19)
+// ============================================================================
+
+const MAGIC_LINK_TOKEN_EXPIRY_MINUTES = Number(process.env.MAGIC_LINK_TOKEN_EXPIRY_MINUTES) || 10;
+
+/** Hash a magic-link token for storage. Only the hash is ever persisted (never the plaintext token). */
+export function hashMagicLinkToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Create a single-use magic-link token for an approved user.
+ * @returns The plaintext token (only returned here, to be embedded in the emailed link) and its expiry.
+ */
+export async function createMagicLinkToken(
+  approvedUserId: number,
+  requestedIp?: string | null
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashMagicLinkToken(token);
+  const expiresAt = new Date(Date.now() + MAGIC_LINK_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+  await pool.query(
+    `insert into magic_link_tokens (approved_user_id, token_hash, expires_at, requested_ip)
+     values ($1, $2, $3, $4)`,
+    [approvedUserId, tokenHash, expiresAt, requestedIp || null]
+  );
+
+  return { token, expiresAt };
+}
+
+export type MagicLinkVerifyResult =
+  | { outcome: "used"; approvedUserId: number }
+  | { outcome: "expired" }
+  | { outcome: "reused" }
+  | { outcome: "invalid" };
+
+/**
+ * Verify and consume a magic-link token. Single-use: marks the token used on success so a
+ * replay attempt is reported as "reused" rather than succeeding again.
+ */
+export async function verifyAndConsumeMagicLinkToken(token: string): Promise<MagicLinkVerifyResult> {
+  const tokenHash = hashMagicLinkToken(token);
+
+  const result = await pool.query<{ id: number; approved_user_id: number; expires_at: Date; used_at: Date | null }>(
+    `select id, approved_user_id, expires_at, used_at from magic_link_tokens where token_hash = $1`,
+    [tokenHash]
+  );
+
+  const row = result.rows[0];
+  if (!row) return { outcome: "invalid" };
+  if (row.used_at) return { outcome: "reused" };
+  if (new Date(row.expires_at).getTime() < Date.now()) return { outcome: "expired" };
+
+  await pool.query(`update magic_link_tokens set used_at = now() where id = $1`, [row.id]);
+
+  return { outcome: "used", approvedUserId: row.approved_user_id };
 }
 
 /**

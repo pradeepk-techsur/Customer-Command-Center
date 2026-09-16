@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { UserList } from "./UserList.tsx";
 import { UserForm } from "./UserForm.tsx";
 import { AuditLogPage } from "./AuditLogPage.tsx";
+import { ApprovedUsersPanel } from "./ApprovedUsersPanel.tsx";
 import type { Role } from "../../../shared/types.ts";
 
 interface User {
@@ -15,12 +16,14 @@ interface User {
   created_at: string;
 }
 
-type AdminTab = "users" | "audit";
+type AdminTab = "users" | "audit" | "approved";
 
 export function AdminPage({ role }: { role: Role }) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("users");
+  // pm (Aiden/Jessica) only has access to the Approved Sign-in List within this page.
+  const pmOnly = role === "pm";
+  const [activeTab, setActiveTab] = useState<AdminTab>(pmOnly ? "approved" : "users");
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!pmOnly);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | undefined>();
@@ -33,7 +36,7 @@ export function AdminPage({ role }: { role: Role }) {
   const canViewAudit = role === "admin" || role === "program_manager";
 
   useEffect(() => {
-    loadUsers();
+    if (!pmOnly) loadUsers();
   }, []);
 
   const loadUsers = async () => {
@@ -220,6 +223,28 @@ export function AdminPage({ role }: { role: Role }) {
     return <AuditLogPage />;
   }
 
+  // Approved sign-in list: Paul, Aiden, and Jessica (pm/program_manager/admin) can all manage it.
+  if (activeTab === "approved") {
+    return (
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1>Approved Sign-in List</h1>
+            <div className="page-sub">Manage which email addresses may request a magic sign-in link</div>
+          </div>
+          {!pmOnly && (
+            <div className="tabs" style={{ marginBottom: 0 }}>
+              <button type="button" className="tab" onClick={() => setActiveTab("users")}>Users</button>
+              {canViewAudit && <button type="button" className="tab" onClick={() => setActiveTab("audit")}>Audit Log</button>}
+              <button type="button" className="tab active" onClick={() => setActiveTab("approved")}>Approved Sign-in List</button>
+            </div>
+          )}
+        </div>
+        <ApprovedUsersPanel />
+      </div>
+    );
+  }
+
   if (loading) {
     return <div className="loading">Loading users...</div>;
   }
@@ -243,10 +268,17 @@ export function AdminPage({ role }: { role: Role }) {
               </button>
               <button
                 type="button"
-                className={activeTab === "audit" ? "tab active" : "tab"}
+                className={(activeTab as AdminTab) === "audit" ? "tab active" : "tab"}
                 onClick={() => setActiveTab("audit")}
               >
                 Audit Log
+              </button>
+              <button
+                type="button"
+                className="tab"
+                onClick={() => setActiveTab("approved")}
+              >
+                Approved Sign-in List
               </button>
             </div>
           )}

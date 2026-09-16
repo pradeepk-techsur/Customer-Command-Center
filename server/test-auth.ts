@@ -10,9 +10,6 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyJWT,
-  createSession,
-  validateSession,
-  invalidateSession,
   generateResetToken,
   type User,
 } from "./auth-service.ts";
@@ -45,11 +42,12 @@ async function runTests() {
   const mockUser: User = {
     id: 1,
     email: "test@example.com",
+    password_hash: hash,
     name: "Test User",
     role: "customer",
     auth_provider: "email",
     status: "active",
-    created_at: new Date(),
+    must_reset_password: false,    can_lock_reports: false,    created_at: new Date(),
     updated_at: new Date(),
   };
 

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import type { ConsolidatedWeeklyReport, CallOrderWeeklyReportStatus, WEEKLY_SECTIONS } from "../../shared/types.ts";
+import type { CallOrder, ConsolidatedWeeklyReport } from "../../shared/types.ts";
 import { api } from "../api.ts";
+import { lines } from "../lib/format.ts";
 import { Button, Field, TextArea, TextInput, showToast, showConfirm } from "./ui.tsx";
+import { WeeklySummaryPanel } from "./WeeklySummaryPanel.tsx";
 import type { Mutate } from "../App.tsx";
 
 interface WeeklyReportDetail {
@@ -36,6 +38,10 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
   const [consolidatedReport, setConsolidatedReport] = useState<ConsolidatedWeeklyReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [callOrders, setCallOrders] = useState<CallOrder[]>([]);
+  const [today, setToday] = useState<string>("");
+
+  useEffect(() => { api.snapshot().then((s) => { setCallOrders(s.callOrders); setToday(s.today); }); }, []);
   
   // Accordion state - start with submitted expanded, missing collapsed
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['submitted']));
@@ -167,20 +173,6 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
     }
   };
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'draft': return '#f57c00';
-      case 'submitted': return '#2e7d32';
-      case 'uploaded': return '#1976d2';
-      default: return '#757575';
-    }
-  };
-
-  const getStatusLabel = (status: string | null) => {
-    if (!status) return 'Missing';
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-  
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections);
     if (newExpanded.has(section)) {
@@ -230,6 +222,12 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
     });
   };
   
+  const toWeeklyReportInput = (f: ReportForm) => ({
+    weekEnding: f.weekEnding, submittedBy: f.submittedBy,
+    accomplishments: lines(f.accomplishments), planned: lines(f.planned),
+    risks: lines(f.risks), issues: lines(f.issues), actions: lines(f.actions),
+  });
+
   const handleSaveReport = async () => {
     if (!editingReport) return;
     
@@ -237,7 +235,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
     setError(null);
     
     try {
-      await mutate(() => api.updateWeeklyReport(editingReport.callOrderId, editingReport.id, reportForm));
+      await mutate(() => api.updateWeeklyReport(editingReport.callOrderId, editingReport.id, toWeeklyReportInput(reportForm)));
       
       // Reload consolidated report
       const updatedReport = await api.getConsolidatedWeeklyReport(selectedWeek);
@@ -263,7 +261,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
       for (const callOrderId of Object.keys(docForm)) {
         const doc = consolidatedDoc[callOrderId];
         if (doc) {
-          await mutate(() => api.updateWeeklyReport(callOrderId, doc.id, docForm[callOrderId]));
+          await mutate(() => api.updateWeeklyReport(callOrderId, doc.id, toWeeklyReportInput(docForm[callOrderId])));
         }
       }
       
@@ -932,6 +930,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
               <Field label="Week Ending">
                 <TextInput 
                   value={reportForm.weekEnding} 
+                  onChange={() => {}}
                   disabled={true}
                 />
               </Field>
@@ -982,7 +981,16 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
                   onChange={(val) => setReportForm({ ...reportForm, actions: val })}
                 />
               </Field>
-              
+
+              {today && (() => {
+                const co = callOrders.find((c) => c.id === editingReport.callOrderId);
+                return co ? (
+                  <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid #eee' }}>
+                    <WeeklySummaryPanel order={co} today={today} />
+                  </div>
+                ) : null;
+              })()}
+
               {error && (
                 <div style={{
                   marginTop: 16,

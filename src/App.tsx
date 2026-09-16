@@ -3,12 +3,11 @@ import type { PortalSnapshot, Role } from "../shared/types.ts";
 import { api, setTokens, getAccessToken } from "./api.ts";
 import { SortContext, type SortState } from "./hooks/useSort.ts";
 import { Masthead, type Page } from "./components/Masthead.tsx";
-import { CallOrdersRegister } from "./components/CallOrdersRegister.tsx";
 import { CallOrderDetail, type Tab } from "./components/CallOrderDetail.tsx";
-import { MonthlyReports } from "./components/MonthlyReports.tsx";
-import { MyReports } from "./components/MyReports.tsx";
-import { ProgramManagerWeeklyReports } from "./components/ProgramManagerWeeklyReports.tsx";
-import { CustomerWeeklyReports } from "./components/CustomerWeeklyReports.tsx";
+import { ContractDetailPage } from "./components/ContractDetailPage.tsx";
+import { StaffDetailPage } from "./components/StaffDetailPage.tsx";
+import { ActionItemsPage } from "./components/ActionItemsPage.tsx";
+import { ContractDeliverablesPage } from "./components/ContractDeliverablesPage.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
 import { RegisterPage } from "./components/RegisterPage.tsx";
 import { AdminPage } from "./components/admin/AdminPage.tsx";
@@ -24,6 +23,7 @@ type AuthUser = {
   name: string;
   role: Role;
   mustResetPassword?: boolean;
+  canLockReports?: boolean;
 };
 
 export default function App() {
@@ -36,6 +36,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("orders");
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Financials");
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [sorts, setSorts] = useState<Record<string, SortState>>({});
 
   // Check authentication on mount and handle OAuth callback
@@ -52,6 +53,38 @@ export default function App() {
         setError(decodeURIComponent(error));
         window.history.replaceState({}, "", "/");
         setAuthLoading(false);
+        return;
+      }
+
+      // Handle magic-link callback (customer/CoR passwordless sign-in, spec §19)
+      if (window.location.pathname === "/auth/magic-link") {
+        const magicToken = params.get("token");
+        window.history.replaceState({}, "", "/");
+        if (!magicToken) {
+          setError("Missing sign-in token.");
+          setAuthLoading(false);
+          return;
+        }
+        try {
+          const res = await fetch("/api/auth/magic-link/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: magicToken }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setError(data.message || data.error || "Sign-in link is invalid or expired.");
+            setAuthLoading(false);
+            return;
+          }
+          setTokens(data.accessToken, data.refreshToken);
+          const userData = await api.getMe();
+          if (userData) setUser(userData);
+        } catch (e) {
+          setError("Failed to complete sign-in.");
+        } finally {
+          setAuthLoading(false);
+        }
         return;
       }
 
@@ -180,9 +213,9 @@ export default function App() {
 
   // canEdit: pm and program_manager can edit their assigned call orders
   const canEdit = user.role === "pm" || user.role === "program_manager" || user.role === "admin";
-  // isProgramManager: only program_manager can access monthly reports
-  const isProgramManager = user.role === "program_manager" || user.role === "admin";
   const order = snapshot && selected ? snapshot.callOrders.find((c) => c.id === selected) : undefined;
+  const selectedStaff = snapshot && selectedStaffId ? snapshot.callOrders.flatMap((c) => c.staff).find((s) => s.id === selectedStaffId) : undefined;
+  const fallbackContract = { id: 0, name: "BPA", agency: "AOUSC", vehicle: "BPA for TSO Support Services", number: "47QTCA20D00C6", popStart: null, popEnd: null, funded: 0, spend: 0, eac: null, peopleAssigned: 0, clins: [], invoices: [], contractDocuments: [], deliverables: [], risks: [], issues: [] };
 
   return (
     <>
@@ -193,8 +226,8 @@ export default function App() {
         page={page} 
         role={user.role} 
         userName={user.name}
-        contract={snapshot?.contract || { agency: "AOUSC", vehicle: "BPA for TSO Support Services", number: "47QTCA20D00C6" }}
-        onPage={setPage} 
+        contract={snapshot?.contract || fallbackContract}
+        onPage={(p) => { setPage(p); if (p === "orders") setSelected(null); }} 
         onLogout={handleLogout}
       />
       {error && (
@@ -204,23 +237,18 @@ export default function App() {
         <AdminPage role={user?.role || "customer"} />
       ) : !snapshot ? (
         <div className="loading">{error ? "The portal data could not be loaded." : "Loading portal data…"}</div>
-      ) : page === "weeklyreports" ? (
-        isProgramManager ? (
-          <ProgramManagerWeeklyReports mutate={mutate} />
-        ) : (
-          <CustomerWeeklyReports />
-        )
-      ) : page === "msr" ? (
-        <MonthlyReports snapshot={snapshot} isPm={isProgramManager} mutate={mutate} />
-      ) : page === "myreports" ? (
-        <MyReports snapshot={snapshot} userId={user.id} mutate={mutate} onNavigate={(callOrderId) => { setSelected(callOrderId); setPage("orders"); setTab("weekly"); }} />
+      ) : page === "actionitems" ? (
+        <ActionItemsPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
+      ) : page === "deliverables" ? (
+        <ContractDeliverablesPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
+      ) : selectedStaff ? (
+        <StaffDetailPage staff={selectedStaff} isPm={canEdit} mutate={mutate} onBack={() => setSelectedStaffId(null)} />
       ) : order ? (
         <CallOrderDetail snapshot={snapshot} order={order} tab={tab} isPm={canEdit} userName={user.name} mutate={mutate}
-          onBack={() => setSelected(null)} onTab={setTab} onSelectPeriod={setSelected} />
+          onBack={() => setSelected(null)} onTab={setTab} onSelectPeriod={setSelected} onSelectStaff={setSelectedStaffId} />
       ) : (
-        <CallOrdersRegister snapshot={snapshot} isPm={canEdit}
-          onOpen={(id, t) => { setSelected(id); setTab(t); }}
-          onUpload={(files) => { void mutate(() => api.uploadCallOrders(files)); }} />
+        <ContractDetailPage snapshot={snapshot}
+          onSelectCallOrder={(id) => { setSelected(id); setTab("Financials"); }} />
       )}
       </SortContext.Provider>
       {showPasswordChange && user && (

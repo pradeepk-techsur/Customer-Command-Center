@@ -5,7 +5,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import type { Role } from "../shared/types.ts";
-import { verifyJWT, type User, type JWTPayload } from "./auth-service.ts";
+import { verifyJWT, type User } from "./auth-service.ts";
 import { pool } from "./db.ts";
 
 // ============================================================================
@@ -106,7 +106,7 @@ export async function authenticateRequest(
  */
 export async function optionalAuth(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> {
   const authHeader = req.header("Authorization");
@@ -242,6 +242,33 @@ export function requireAdminOrProgramManager(req: Request, res: Response, next: 
     res.status(403).json({ 
       error: "Insufficient permissions",
       message: "Only Administrators and Program Managers can access this resource" 
+    });
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Require weekly-report lock/correct authority (spec §5.1/§17.7, decision #10):
+ * Program Managers/admins always have it; Paul can additionally designate other users
+ * via the can_lock_reports flag without granting them the full program_manager role.
+ * Must be used AFTER authenticateRequest middleware.
+ */
+export function requireLockAuthority(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({
+      error: "Authentication required",
+      message: "Must be authenticated to perform this action"
+    });
+    return;
+  }
+
+  const hasAuthority = req.user.role === "program_manager" || req.user.role === "admin" || req.user.can_lock_reports === true;
+  if (!hasAuthority) {
+    res.status(403).json({
+      error: "Insufficient permissions",
+      message: "Only Paul or a designated locker can lock or correct a weekly report"
     });
     return;
   }
@@ -400,7 +427,7 @@ export async function requireCallOrderAccess(
       pool,
       req.user.id,
       req.user.role,
-      callOrderId
+      String(callOrderId)
     );
 
     if (!hasAccess) {

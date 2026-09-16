@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import type { CallOrder } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { Eyebrow } from "./ui.tsx";
+import { WeeklySummaryPanel } from "./WeeklySummaryPanel.tsx";
 
 interface CustomerWeeklyReport {
   id: number;
@@ -26,6 +28,8 @@ export function CustomerWeeklyReports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedCallOrders, setExpandedCallOrders] = useState<Set<number>>(new Set());
+  const [callOrders, setCallOrders] = useState<CallOrder[]>([]);
+  const [today, setToday] = useState<string>("");
 
   useEffect(() => {
     loadWeeklyReports();
@@ -38,6 +42,8 @@ export function CustomerWeeklyReports() {
       
       // Load detailed report data for each report
       const snapshot = await api.snapshot();
+      setCallOrders(snapshot.callOrders);
+      setToday(snapshot.today);
       const enrichedReports = data.weeklyReports.map((weekReport: CustomerWeeklyReport) => ({
         ...weekReport,
         reports: weekReport.reports.map(report => {
@@ -195,6 +201,14 @@ export function CustomerWeeklyReports() {
                         </ul>
                       </div>
                     ))}
+                    {today && (() => {
+                      const co = callOrders.find((c) => c.id === report.callOrderId);
+                      return co ? (
+                        <div style={{ marginTop: 20 }}>
+                          <WeeklySummaryPanel order={co} today={today} />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 )}
 

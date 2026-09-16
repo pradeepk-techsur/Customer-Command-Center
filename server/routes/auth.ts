@@ -22,6 +22,9 @@ import {
   updateLastLogin,
   createPasswordResetToken,
   validatePasswordResetToken,
+  createMagicLinkToken,
+  verifyAndConsumeMagicLinkToken,
+  logAuthEvent,
   type User,
 } from "../auth-service.ts";
 import {
@@ -30,7 +33,7 @@ import {
   getOrCreateUser,
   isAzureConfigured,
 } from "../azure-auth.ts";
-import { sendPasswordResetEmail, sendWelcomeEmail } from "../email-service.ts";
+import { sendPasswordResetEmail, sendWelcomeEmail, sendMagicLinkEmail } from "../email-service.ts";
 
 const router = express.Router();
 
@@ -65,9 +68,14 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// ============================================================================
-// Registration & Login (Email/Password)
-// ============================================================================
+// Magic-link request: 5 attempts per 15 minutes per IP (spec §19.3 abuse protection)
+const magicLinkLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many sign-in requests", message: "Please try again in 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * POST /api/auth/register
@@ -333,7 +341,7 @@ router.post("/change-password", authenticateRequest, async (req, res) => {
     if (!validation.valid) {
       res.status(400).json({
         error: "Invalid password",
-        message: validation.message,
+        message: validation.error,
       });
       return;
     }
@@ -403,6 +411,7 @@ router.get("/me", authenticateRequest, (req, res) => {
     name: req.user.name,
     role: req.user.role,
     auth_provider: req.user.auth_provider,
+    canLockReports: req.user.role === "program_manager" || req.user.role === "admin" || req.user.can_lock_reports,
     last_login_at: req.user.last_login_at,
     created_at: req.user.created_at,
   });
@@ -603,7 +612,7 @@ router.post("/password-reset/confirm", async (req, res) => {
  * GET /api/auth/microsoft/login
  * Redirect to Microsoft login page.
  */
-router.get("/microsoft/login", async (req, res) => {
+router.get("/microsoft/login", async (_req, res) => {
   try {
     if (!isAzureConfigured()) {
       res.status(503).json({
@@ -682,6 +691,140 @@ router.get("/microsoft/callback", async (req, res) => {
     console.error("Microsoft callback error:", error);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     res.redirect(`${frontendUrl}/login?error=${encodeURIComponent("Microsoft authentication failed")}`);
+  }
+});
+
+// ============================================================================
+// Magic-Link Authentication (Mission Control Slice 1, spec §19)
+// ============================================================================
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+/**
+ * POST /api/auth/magic-link/request
+ * Request a single-use sign-in link. Always returns the same generic message
+ * for approved and unapproved addresses to prevent email-address enumeration (spec §19.2).
+ */
+router.post("/magic-link/request", magicLinkLimiter, async (req, res) => {
+  const genericResponse = { message: "If this address is approved, a secure sign-in link will arrive shortly." };
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const ip = req.ip || null;
+
+    if (!email) {
+      res.json(genericResponse);
+      return;
+    }
+
+    await logAuthEvent({ eventType: "magic_link_requested", email, ipAddress: ip });
+
+    const approvedResult = await pool.query<{ id: number; email: string; name: string; role: string; status: string }>(
+      `select id, email, name, role, status from approved_users where lower(email) = $1`,
+      [email]
+    );
+    const approved = approvedResult.rows[0];
+
+    if (!approved || approved.status !== "active") {
+      await logAuthEvent({ eventType: "magic_link_rejected", email, ipAddress: ip });
+      res.json(genericResponse);
+      return;
+    }
+
+    await logAuthEvent({ eventType: "magic_link_approved", email, ipAddress: ip });
+
+    const { token, expiresAt } = await createMagicLinkToken(approved.id, ip);
+    const magicLinkUrl = `${FRONTEND_URL}/auth/magic-link?token=${encodeURIComponent(token)}`;
+
+    await logAuthEvent({ eventType: "magic_link_issued", email, ipAddress: ip, details: { expiresAt } });
+
+    await sendMagicLinkEmail(approved.email, magicLinkUrl, Number(process.env.MAGIC_LINK_TOKEN_EXPIRY_MINUTES) || 10);
+
+    res.json(genericResponse);
+  } catch (error) {
+    console.error("Magic-link request error:", error);
+    // Never leak internal errors to the client for this endpoint (spec §19.2/§19.5).
+    res.json(genericResponse);
+  }
+});
+
+/**
+ * POST /api/auth/magic-link/verify
+ * Consume a magic-link token, provision/reuse the user account, and start a session.
+ */
+router.post("/magic-link/verify", async (req, res) => {
+  try {
+    const token = String(req.body?.token || "");
+    const ip = req.ip || null;
+
+    if (!token) {
+      res.status(400).json({ error: "Missing token", message: "A sign-in token is required" });
+      return;
+    }
+
+    const result = await verifyAndConsumeMagicLinkToken(token);
+
+    if (result.outcome === "invalid") {
+      await logAuthEvent({ eventType: "magic_link_invalid_attempt", ipAddress: ip });
+      res.status(401).json({ error: "Invalid link", message: "This sign-in link is invalid." });
+      return;
+    }
+    if (result.outcome === "expired") {
+      await logAuthEvent({ eventType: "magic_link_expired_attempt", ipAddress: ip });
+      res.status(401).json({ error: "Link expired", message: "This sign-in link has expired. Request a new one." });
+      return;
+    }
+    if (result.outcome === "reused") {
+      await logAuthEvent({ eventType: "magic_link_reuse_attempt", ipAddress: ip });
+      res.status(401).json({ error: "Link already used", message: "This sign-in link has already been used. Request a new one." });
+      return;
+    }
+
+    const approvedResult = await pool.query<{ id: number; email: string; name: string; role: string }>(
+      `select id, email, name, role from approved_users where id = $1 and status = 'active'`,
+      [result.approvedUserId]
+    );
+    const approved = approvedResult.rows[0];
+    if (!approved) {
+      res.status(401).json({ error: "Access revoked", message: "This account is no longer approved." });
+      return;
+    }
+
+    // Provision the Mission Control user account on first sign-in, or reuse the existing one.
+    let userResult = await pool.query<User>(`select * from users where lower(email) = lower($1)`, [approved.email]);
+    let user = userResult.rows[0];
+    if (!user) {
+      const created = await pool.query<User>(
+        `insert into users (email, password_hash, name, role, auth_provider, status)
+         values ($1, null, $2, $3, 'email', 'active')
+         returning *`,
+        [approved.email.toLowerCase(), approved.name, approved.role]
+      );
+      user = created.rows[0];
+    }
+
+    if (user.status !== "active") {
+      res.status(403).json({ error: "Account inactive", message: `Your account is ${user.status}.` });
+      return;
+    }
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    await createSession(user.id, refreshToken);
+    await updateLastLogin(user.id);
+
+    await logAuthEvent({
+      eventType: "magic_link_used", email: user.email, userId: user.id, roleAssigned: user.role, ipAddress: ip,
+    });
+    await logAuthEvent({ eventType: "session_start", email: user.email, userId: user.id, roleAssigned: user.role, ipAddress: ip });
+
+    res.json({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    });
+  } catch (error) {
+    console.error("Magic-link verify error:", error);
+    res.status(500).json({ error: "Sign-in failed", message: "An error occurred while signing in." });
   }
 });
 

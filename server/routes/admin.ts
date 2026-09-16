@@ -5,7 +5,7 @@
 
 import express from "express";
 import { pool } from "../db.ts";
-import { authenticateRequest, requireAdmin, requireAdminOrProgramManager } from "../auth-middleware.ts";
+import { authenticateRequest, requireAdminOrProgramManager } from "../auth-middleware.ts";
 import { hashPassword, validatePassword } from "../auth-service.ts";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
@@ -208,7 +208,7 @@ router.post("/users", requireAdminOrProgramManager, createUserLimiter, async (re
         if (!validation.valid) {
           res.status(400).json({
             error: "Invalid password",
-            message: validation.message,
+            message: validation.error,
           });
           return;
         }
@@ -256,13 +256,22 @@ router.post("/users", requireAdminOrProgramManager, createUserLimiter, async (re
 router.patch("/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, status } = req.body;
+    const { name, role, status, canLockReports } = req.body;
 
     // Validate at least one field to update
-    if (!name && !role && !status) {
+    if (!name && !role && !status && canLockReports === undefined) {
       res.status(400).json({
         error: "No fields to update",
-        message: "Provide at least one field to update (name, role, or status)",
+        message: "Provide at least one field to update (name, role, status, or canLockReports)",
+      });
+      return;
+    }
+
+    // Only Paul (program_manager) or an admin can designate additional weekly-report lockers (spec §5.1/§17.7).
+    if (canLockReports !== undefined && req.user!.role !== "program_manager" && req.user!.role !== "admin") {
+      res.status(403).json({
+        error: "Insufficient permissions",
+        message: "Only Paul or an administrator can designate weekly-report lockers",
       });
       return;
     }
@@ -318,10 +327,16 @@ router.patch("/users/:id", async (req, res) => {
       paramIndex++;
     }
 
+    if (canLockReports !== undefined) {
+      updates.push(`can_lock_reports = $${paramIndex}`);
+      params.push(!!canLockReports);
+      paramIndex++;
+    }
+
     updates.push(`updated_at = now()`);
     params.push(id);
 
-    const query = `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING id, email, name, role, auth_provider, status, created_at, updated_at`;
+    const query = `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING id, email, name, role, auth_provider, status, can_lock_reports, created_at, updated_at`;
 
     const result = await pool.query<User>(query, params);
 
@@ -403,7 +418,7 @@ router.post("/users/:id/reset-password", async (req, res) => {
     if (!validation.valid) {
       res.status(400).json({
         error: "Invalid password",
-        message: validation.message,
+        message: validation.error,
       });
       return;
     }
@@ -462,7 +477,7 @@ router.post("/users/:id/reset-password", async (req, res) => {
  * GET /api/admin/call-orders
  * List all call orders (for assignment UI).
  */
-router.get("/call-orders", async (req, res) => {
+router.get("/call-orders", async (_req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name, group_name, pm, pending 

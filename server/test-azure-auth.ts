@@ -7,7 +7,6 @@ import {
   getAuthCodeUrl,
   getOrCreateUser,
   getUserByAzureOid,
-  isAzureConfigured,
   getConfigStatus,
   type AzureProfile,
 } from "./azure-auth.ts";

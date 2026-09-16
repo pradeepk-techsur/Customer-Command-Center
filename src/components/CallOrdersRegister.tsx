@@ -28,8 +28,8 @@ const COLS = [
   { key: "spend", label: "Actual spend", align: "right" as const }, { key: "updated", label: "Last updated", align: "right" as const },
 ];
 
-export function CallOrdersRegister({ snapshot, isPm, onOpen, onUpload }: {
-  snapshot: PortalSnapshot; isPm: boolean; onOpen: (id: string, tab: Tab) => void; onUpload: (files: FileList) => void;
+export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, onUpload }: {
+  snapshot: PortalSnapshot; isPm: boolean; onOpen: (id: string, tab: Tab) => void; onBackToDashboard: () => void; onUpload: (files: FileList) => void;
 }) {
   const { callOrders: all, today, config } = snapshot;
   const groups = groupCallOrders(all, today);
@@ -49,6 +49,7 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onUpload }: {
 
   return (
     <div className="page">
+      <button type="button" className="back-link" onClick={onBackToDashboard}><span className="mono">←</span><span>BPA dashboard</span></button>
       <div className="page-head">
         <div>
           <h1>Call Orders</h1>

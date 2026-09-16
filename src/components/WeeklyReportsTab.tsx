@@ -4,6 +4,8 @@ import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
 import { lines, localDate, todayLabel } from "../lib/format.ts";
 import { Button, Eyebrow, Field, FileButton, SortHeaders, TextArea, TextInput } from "./ui.tsx";
+import { WeeklySummaryPanel } from "./WeeklySummaryPanel.tsx";
+import { ActionItemsPanel } from "./ActionItemsPanel.tsx";
 import type { Mutate } from "../App.tsx";
 
 const WSR_COLS = [
@@ -20,7 +22,7 @@ interface Week {
   label: string;  // "Sep 8, 2026"
 }
 
-export function WeeklyReportsTab({ order: c, isPm, userName, mutate }: { order: CallOrder; isPm: boolean; userName?: string; mutate: Mutate }) {
+export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { order: CallOrder; isPm: boolean; userName?: string; today?: string; mutate: Mutate }) {
   const reports = c.weeklyReports;
   const [selected, setSelected] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -334,6 +336,20 @@ export function WeeklyReportsTab({ order: c, isPm, userName, mutate }: { order: 
           </div>
         )}
       </div>
+
+      {today && open && (
+        <div className="card" style={{ marginTop: 18 }}>
+          <div className="card-head">Action items</div>
+          <div style={{ padding: 18 }}><ActionItemsPanel callOrderId={c.id} weeklyReportId={open.id} actionItems={c.actionItems} today={today} isPm={isPm} mutate={mutate} /></div>
+        </div>
+      )}
+
+      {today && (
+        <div className="card" style={{ marginTop: 18 }}>
+          <div className="card-head">Meeting summary — current status</div>
+          <div style={{ padding: 18 }}><WeeklySummaryPanel order={c} today={today} /></div>
+        </div>
+      )}
     </>
   );
 }

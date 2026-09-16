@@ -1,37 +1,42 @@
-/* Contract Transparency Portal — neutral, dense, government reporting instrument.
-   Tokens follow the design: IBM Plex, warm-neutral greys, one accent, 1px hairlines, 2–3px radii. */
+/* TechSur Mission Control — dense reporting instrument, TechSur brand palette/type applied per brand guide.
+   Gold accent kept sparing (per guide: ~10% of any view, accents only); neutrals are warm, not cool grays. */
 
 :root {
-  --accent: oklch(0.52 0.09 245);
-  --accent-hover: oklch(0.42 0.09 245);
-  --accent-tint: #eef3f7;
+  /* TechSur brand: Gold 600 for text/links/borders (Gold 400 fails contrast on light surfaces per brand guide);
+     Gold 400 reserved for solid-fill CTAs, paired with near-black text. */
+  --accent: #b0832a;
+  --accent-hover: #8f6a20;
+  --accent-tint: #fbf3e1;
+  --accent-fill: #fbca5c;
+  --accent-fill-ink: #1a1a1a;
   --warn: oklch(0.62 0.14 45);
   --burn-mid: oklch(0.72 0.15 78);
   --burn-high: oklch(0.55 0.2 27);
 
-  --page: #f6f7f8;
+  --page: #faf9f7;
   --surface: #fff;
-  --surface-2: #fafbfb;
-  --surface-3: #fbfcfc;
-  --surface-active: #f4f7fa;
-  --surface-hover: #f1f4f6;
+  --surface-2: #f5f5f2;
+  --surface-3: #f8f8f6;
+  --surface-active: #fbf3e1;
+  --surface-hover: #f5f5f2;
 
-  --line: #e2e5e8;
-  --line-soft: #eef0f2;
-  --line-faint: #f2f4f5;
-  --line-control: #c8ced3;
-  --line-input: #d6dade;
+  --line: #e5e3dd;
+  --line-soft: #eeede8;
+  --line-faint: #f2f1ec;
+  --line-control: #cfcbc0;
+  --line-input: #d9d5cb;
 
-  --ink: #1b1e21;
-  --ink-2: #35393d;
-  --ink-3: #4b5257;
-  --muted: #6c757d;
-  --label: #8b9299;
-  --departed: #9aa1a7;
-  --ghost: #b6bcc1;
+  --ink: #1a1a1a;
+  --ink-2: #2e2e2c;
+  --ink-3: #4a4944;
+  --muted: #6b675f;
+  --label: #8b8780;
+  --departed: #a8a59b;
+  --ghost: #c4c0b6;
 
-  --sans: "IBM Plex Sans", Helvetica, sans-serif;
-  --mono: "IBM Plex Mono", monospace;
+  --sans: "Inter", "IBM Plex Sans", Helvetica, sans-serif;
+  --mono: "JetBrains Mono", "IBM Plex Mono", monospace;
+  --display: "Montserrat", var(--sans);
 }
 
 * { box-sizing: border-box; }
@@ -47,7 +52,7 @@ body {
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); text-decoration: underline; }
 input[type="file"] { display: none; }
-h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 6px; line-height: 1.2; }
+h1 { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; line-height: 1.2; }
 
 .num { font-variant-numeric: tabular-nums; }
 .right { text-align: right; }
@@ -76,7 +81,7 @@ h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 6px
 /* Masthead */
 .masthead { border-bottom: 1px solid var(--line); background: var(--surface); }
 .masthead-row { max-width: 1240px; margin: 0 auto; padding: 16px 32px; display: flex; align-items: baseline; gap: 14px; }
-.masthead-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.masthead-title { font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
 .masthead-contract { font-family: var(--mono); font-size: 11px; color: var(--label); letter-spacing: 0.04em; }
 .masthead-nav { max-width: 1240px; margin: 0 auto; padding: 0 32px; display: flex; gap: 4px; align-items: center; justify-content: space-between; }
 .nav-tabs { display: flex; gap: 4px; }
@@ -102,6 +107,10 @@ h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 6px
 .card-head.pane .pane-title { font-size: 14px; font-weight: 600; }
 .card-head.pane .pane-sub { font-family: var(--mono); font-size: 11px; color: var(--label); margin-top: 4px; }
 .card-empty { padding: 26px 22px; font-size: 13px; color: var(--muted); }
+.accordion-toggle { width: 100%; border: 0; background: none; cursor: pointer; font-family: inherit; color: inherit; text-align: left; }
+.accordion-toggle:hover { background: var(--surface-hover); }
+.accordion-chevron { display: inline-block; font-size: 10px; color: var(--label); transition: transform 0.15s; transform: rotate(0deg); }
+.accordion-chevron.open { transform: rotate(90deg); }
 
 .grid { display: grid; gap: 16px; align-items: center; }
 .thead { padding: 11px 20px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
@@ -148,7 +157,8 @@ h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 6px
   padding: 8px 15px; border-radius: 3px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; font-family: inherit;
   border: 1px solid var(--line-control); background: var(--surface); color: var(--ink);
 }
-.btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.btn.primary { border-color: var(--accent-fill); background: var(--accent-fill); color: var(--accent-fill-ink); font-weight: 700; }
+.btn.primary:hover { background: #f0b73f; border-color: #f0b73f; }
 .btn:disabled { opacity: 0.6; cursor: default; }
 .btn.outline {
   display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px;

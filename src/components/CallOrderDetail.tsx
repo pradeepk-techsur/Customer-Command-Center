@@ -6,15 +6,19 @@ import { FinancialsTab } from "./FinancialsTab.tsx";
 import { PeopleTab } from "./PeopleTab.tsx";
 import { WeeklyReportsTab } from "./WeeklyReportsTab.tsx";
 import { CallOrderHistory } from "./CallOrderHistory.tsx";
+import { InvoicesTab } from "./InvoicesTab.tsx";
+import { ContractFileTab } from "./ContractFileTab.tsx";
+import { RisksTab } from "./RisksTab.tsx";
+import { IssuesTab } from "./IssuesTab.tsx";
 import type { Mutate } from "../App.tsx";
 
-export type Tab = "Financials" | "People" | "Weekly Status Reports" | "History";
+export type Tab = "Financials" | "People" | "Invoices" | "Contract File" | "Risks" | "Issues" | "Weekly Status Reports" | "History";
 
 // Only Project Managers get Weekly Reports tab in call orders
 // Program Managers, Admins, and Customers use top navigation tabs
 // History tab is available to all roles
 function getTabs(role: string): Tab[] {
-  const baseTabs: Tab[] = ["Financials", "People"];
+  const baseTabs: Tab[] = ["Financials", "Invoices", "Contract File", "People", "Risks", "Issues"];
   if (role === "pm") {
     baseTabs.push("Weekly Status Reports");
   }
@@ -22,9 +26,9 @@ function getTabs(role: string): Tab[] {
   return baseTabs;
 }
 
-export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBack, onTab, onSelectPeriod, mutate }: {
+export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBack, onTab, onSelectPeriod, onSelectStaff, mutate }: {
   snapshot: PortalSnapshot; order: CallOrder; tab: Tab; isPm: boolean; userName?: string;
-  onBack: () => void; onTab: (t: Tab) => void; onSelectPeriod: (id: string) => void; mutate: Mutate;
+  onBack: () => void; onTab: (t: Tab) => void; onSelectPeriod: (id: string) => void; onSelectStaff?: (staffId: number) => void; mutate: Mutate;
 }) {
   const role = snapshot.actor?.role || "customer";
   const TABS = getTabs(role);
@@ -68,8 +72,12 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBac
       </div>
 
       {tab === "Financials" && <FinancialsTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} />}
-      {tab === "People" && <PeopleTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} />}
-      {tab === "Weekly Status Reports" && <WeeklyReportsTab order={c} isPm={isPm} userName={userName} mutate={mutate} />}
+      {tab === "Invoices" && <InvoicesTab callOrderId={c.id} invoices={c.invoices} today={today} isPm={isPm} mutate={mutate} />}
+      {tab === "Contract File" && <ContractFileTab callOrderId={c.id} documents={c.contractDocuments} isPm={isPm} mutate={mutate} />}
+      {tab === "People" && <PeopleTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} onSelectStaff={onSelectStaff} />}
+      {tab === "Risks" && <RisksTab callOrderId={c.id} risks={c.risks} isPm={isPm} mutate={mutate} />}
+      {tab === "Issues" && <IssuesTab callOrderId={c.id} issues={c.issues} isPm={isPm} mutate={mutate} />}
+      {tab === "Weekly Status Reports" && <WeeklyReportsTab order={c} isPm={isPm} userName={userName} today={snapshot.today} mutate={mutate} />}
       {tab === "History" && <CallOrderHistory callOrderId={c.id} userRole={snapshot.actor?.role || 'customer'} />}
     </div>
   );

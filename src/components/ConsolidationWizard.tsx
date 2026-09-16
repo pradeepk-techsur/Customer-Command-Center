@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { MonthlyReport } from "../../shared/types.ts";
 import { getAccessToken } from "../api.ts";
-import { Button, Field, TextInput } from "./ui.tsx";
+import { Button } from "./ui.tsx";
 
 interface ConsolidationWizardProps {
   period: string;

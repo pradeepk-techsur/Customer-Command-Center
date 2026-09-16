@@ -48,12 +48,13 @@ export async function getAccessibleCallOrders(
   userId: number,
   userRole: string
 ): Promise<string[] | null> {
-  // Program Managers, admins, and customers have access to all call orders
-  if (userRole === "program_manager" || userRole === "admin" || userRole === "customer") {
+  // Program Managers and admins have access to all call orders
+  if (userRole === "program_manager" || userRole === "admin") {
     return null;
   }
 
-  // For PMs: get assigned call orders
+  // For PMs and customers: get assigned call orders (matches auth-middleware.ts's
+  // hasCallOrderAccess/requireCallOrderAccess enforcement, which also restricts customers)
   const result = await db.query<{ call_order_id: string }>(
     `select call_order_id from user_call_orders where user_id = $1`,
     [userId]

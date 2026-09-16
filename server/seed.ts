@@ -11,7 +11,17 @@ const DEFAULT_STAMPS = { fin: "2026-08-31", people: "2026-09-02" };
 export async function seed() {
   await migrate();
   await withTransaction(async (db) => {
-    await db.query("truncate msr_sections, monthly_reports, weekly_report_items, weekly_reports, staff, labor_categories, call_orders restart identity cascade");
+    await db.query(
+      "truncate msr_sections, monthly_reports, weekly_report_items, weekly_reports, " +
+      "action_items, issues, risks, deliverables, contract_documents, invoices, clin_monthly_spend, clins, contracts, " +
+      "staff_transfers, staff_equipment, staff, labor_categories, call_orders restart identity cascade"
+    );
+
+    await db.query(
+      `insert into contracts (name, agency, vehicle, number, funded, spend)
+       values ($1,$2,$3,$4,0,0)`,
+      ["TSO Support Services BPA", "AOUSC", "BPA for TSO Support Services", "47QTCA20D00C6"]
+    );
     
     // Seed test users with password "Password123!"
     const testPassword = await hashPassword("Password123!");
@@ -25,9 +35,16 @@ export async function seed() {
       // Program Managers (full access)
       { email: "ceenil.kaur@techsur.com", name: "Ceenil Kaur", role: "program_manager" },
       { email: "lauryn.brown@techsur.com", name: "Lauryn Brown", role: "program_manager" },
+      { email: "paul.schomburg@techsur.com", name: "Paul Schomburg", role: "program_manager" },
       // Project Managers (assigned call orders only)
       { email: "alex.johnson@techsur.com", name: "Alex Johnson", role: "pm" },
       { email: "maria.garcia@techsur.com", name: "Maria Garcia", role: "pm" },
+      // PM support: full BPA-wide access (assigned to every call order below)
+      { email: "aiden.park@techsur.com", name: "Aiden Park", role: "pm" },
+      { email: "jessica.delasalle@techsur.com", name: "Jessica de la Salle", role: "pm" },
+      // CORs: full BPA-wide read access (assigned to every call order below)
+      { email: "joan.nairn@aousc.gov", name: "Joan Nairn", role: "customer" },
+      { email: "dean-anne.campbell@aousc.gov", name: "Dean-Anne Campbell", role: "customer" },
       // Admin
       { email: "admin@techsur.com", name: "Admin User", role: "admin" },
     ];
@@ -160,6 +177,15 @@ export async function seed() {
         );
       }
     }
+
+    // BPA-wide PM support (Aiden/Jessica) and CORs (Joan/Dean-Anne) see/edit every call order.
+    await db.query(
+      `insert into user_call_orders (user_id, call_order_id)
+       select u.id, c.id from users u cross join call_orders c
+       where u.email in ('aiden.park@techsur.com','jessica.delasalle@techsur.com','joan.nairn@aousc.gov','dean-anne.campbell@aousc.gov')
+         and not c.pending
+       on conflict do nothing`
+    );
   });
 }
 

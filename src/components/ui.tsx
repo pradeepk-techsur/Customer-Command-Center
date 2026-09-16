@@ -46,12 +46,14 @@ export function Field({ label, plain, children, style }: { label: string; plain?
   );
 }
 
-export function TextInput({ value, onChange, small, style, disabled }: { value: string; onChange: (v: string) => void; small?: boolean; style?: React.CSSProperties; disabled?: boolean }) {
-  return <input type="text" className={"input num" + (small ? " small" : "")} value={value} onChange={(e) => onChange(e.target.value)} style={style} disabled={disabled} />;
+export function TextInput({ value, onChange, small, style, disabled, placeholder, type }: {
+  value: string; onChange: (v: string) => void; small?: boolean; style?: React.CSSProperties; disabled?: boolean; placeholder?: string; type?: string;
+}) {
+  return <input type={type || "text"} className={"input num" + (small ? " small" : "")} value={value} onChange={(e) => onChange(e.target.value)} style={style} disabled={disabled} placeholder={placeholder} />;
 }
 
-export function TextArea({ value, onChange, rows, small }: { value: string; onChange: (v: string) => void; rows: number; small?: boolean }) {
-  return <textarea className={"textarea" + (small ? " small" : "")} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />;
+export function TextArea({ value, onChange, rows, small, style }: { value: string; onChange: (v: string) => void; rows: number; small?: boolean; style?: React.CSSProperties }) {
+  return <textarea className={"textarea" + (small ? " small" : "")} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} style={style} />;
 }
 
 // Toast notification system

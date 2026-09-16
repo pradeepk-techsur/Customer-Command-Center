@@ -7,7 +7,7 @@ import { dirname, join, basename } from "node:path";
 import { pool, withTransaction } from "./db.ts";
 import { migrate } from "./migrate.ts";
 import { actorOf, requirePm } from "./auth.ts";
-import { authenticateRequest, requireCallOrderAccess, getAccessibleCallOrders, requireProgramManager } from "./auth-middleware.ts";
+import { authenticateRequest, requireCallOrderAccess, getAccessibleCallOrders, requireProgramManager, requireLockAuthority } from "./auth-middleware.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { captureCallOrderSnapshot, captureStaffSnapshot } from "./snapshot-history.ts";
 import { dayLabel, firstOfMonth, monthLabel, toIsoDate } from "./dates.ts";
@@ -16,6 +16,14 @@ import { WEEKLY_SECTIONS } from "../shared/types.ts";
 import type pg from "pg";
 import authRouter from "./routes/auth.ts";
 import adminRouter from "./routes/admin.ts";
+import clinsRouter from "./routes/clins.ts";
+import invoicesRouter from "./routes/invoices.ts";
+import contractDocumentsRouter from "./routes/contract-documents.ts";
+import deliverablesRouter from "./routes/deliverables.ts";
+import risksIssuesRouter from "./routes/risks-issues.ts";
+import staffingRouter from "./routes/staffing.ts";
+import actionItemsRouter, { archiveRouter as actionItemsArchiveRouter } from "./routes/action-items.ts";
+import approvedUsersRouter from "./routes/approved-users.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -43,6 +51,36 @@ app.use("/api/auth", authRouter);
 
 // Mount admin routes (requires admin role)
 app.use("/api/admin", adminRouter);
+
+// Approved-user (magic-link allowlist) management: Paul, Aiden, and Jessica (pm/program_manager/admin) all manage this.
+app.use("/api/approved-users", approvedUsersRouter);
+
+// Security/authentication event log: never visible to customer-role users (spec §19.4/§19.5).
+app.get("/api/auth-events", authenticateRequest, requirePm, async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 200, 1000);
+    const { rows } = await pool.query(
+      `select * from authentication_events order by occurred_at desc limit $1`,
+      [limit],
+    );
+    res.json({
+      events: rows.map((e) => ({
+        id: e.id, eventType: e.event_type, email: e.email, userId: e.user_id,
+        roleAssigned: e.role_assigned, ipAddress: e.ip_address, details: e.details, occurredAt: e.occurred_at,
+      })),
+    });
+  } catch (err) { next(err); }
+});
+
+// Mount scoped routes. :callOrderId is either a real call order id or the literal "bpa" for BPA-level records.
+app.use("/api/scope/:callOrderId/clins", clinsRouter);
+app.use("/api/scope/:callOrderId/invoices", invoicesRouter);
+app.use("/api/scope/:callOrderId/contract-documents", contractDocumentsRouter);
+app.use("/api/scope/:callOrderId/deliverables", deliverablesRouter);
+app.use("/api/scope/:callOrderId/action-items", actionItemsRouter);
+app.use("/api/scope/:callOrderId/risks-issues", risksIssuesRouter);
+app.use("/api/action-items/archive", actionItemsArchiveRouter);
+app.use("/api/staffing", staffingRouter);
 
 type Db = pg.PoolClient;
 
@@ -443,9 +481,12 @@ app.put("/api/call-orders/:id/weekly-reports/:reportId", authenticateRequest, re
     return false;
   }
   
-  // Project Managers can edit their own reports anytime (draft or submitted)
-  // No status restrictions for editing
-  
+  // Locked down once submitted: corrections require creating a new report instead of editing in place.
+  if (report.status_v2 !== 'draft') {
+    res.status(409).json({ error: "This report has been submitted and is locked. Create a new report for corrections." });
+    return false;
+  }
+
   const body = (req.body || {}) as Partial<WeeklyReportInput>;
   const weekLabel = String(body.weekEnding || "").trim() || dayLabel();
   const submittedBy = String(body.submittedBy || "").trim() || "Project Manager";
@@ -546,7 +587,7 @@ app.post("/api/call-orders/:id/weekly-reports/:reportId/submit", authenticateReq
 import { getPastSundays, toIsoDateString, toWeekLabel } from "./weekly-utils.ts";
 
 // Get available week ending dates (Sundays) for dropdown
-app.get("/api/weekly-reports/weeks", authenticateRequest, async (req, res, next) => {
+app.get("/api/weekly-reports/weeks", authenticateRequest, async (_req, res, next) => {
   try {
     const sundays = getPastSundays(12); // Past 12 weeks
     const weeks = sundays.map(date => ({
@@ -562,7 +603,7 @@ app.get("/api/weekly-reports/weeks", authenticateRequest, async (req, res, next)
 // Get consolidated view of all call order reports for a specific week (Program Manager)
 app.get("/api/weekly-reports/consolidated/:weekEnding", authenticateRequest, requireProgramManager, async (req, res, next) => {
   try {
-    const weekEnding = req.params.weekEnding;
+    const weekEnding = String(req.params.weekEnding);
     const client = await pool.connect();
     
     try {
@@ -647,8 +688,8 @@ app.get("/api/weekly-reports/consolidated/:weekEnding", authenticateRequest, req
   }
 });
 
-// Submit consolidated weekly report to customers (Program Manager only)
-app.post("/api/weekly-reports/consolidated/:weekEnding/submit", authenticateRequest, requireProgramManager, mutation(async (db, req, res) => {
+// Submit (lock) consolidated weekly report to customers — Paul or a designated locker only (spec §5.1/§17.7).
+app.post("/api/weekly-reports/consolidated/:weekEnding/submit", authenticateRequest, requireLockAuthority, mutation(async (db, req, res) => {
   const weekEnding = req.params.weekEnding;
   
   // Check if consolidated report exists
@@ -823,7 +864,7 @@ app.post("/api/monthly-reports/upload", authenticateRequest, requireProgramManag
 
 // Submit monthly report for customer review
 app.post("/api/monthly-reports/:id/submit", authenticateRequest, requireProgramManager, mutation(async (db, req) => {
-  const reportId = parseInt(req.params.id, 10);
+  const reportId = parseInt(String(req.params.id), 10);
   if (isNaN(reportId)) throw new Error("Invalid report ID");
   
   // Update report status to "Submitted to Customer" and make visible to customers
@@ -1037,7 +1078,7 @@ app.put("/api/monthly-reports/:id/sections/:callOrderId", authenticateRequest, r
     res.status(400).json({ error: "Missing call order ID" });
     return;
   }
-  const hasAccess = await hasCallOrderAccess(pool, req.user!.id, req.user!.role, callOrderId);
+  const hasAccess = await hasCallOrderAccess(pool, req.user!.id, req.user!.role, String(callOrderId));
   if (!hasAccess) {
     res.status(403).json({ error: "Access denied", message: "You do not have permission to access this call order" });
     return;

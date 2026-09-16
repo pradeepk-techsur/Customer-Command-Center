@@ -41,7 +41,7 @@ function getMsalClient(): msal.ConfidentialClientApplication {
       },
       system: {
         loggerOptions: {
-          loggerCallback(loglevel, message, containsPii) {
+          loggerCallback(_loglevel, message, _containsPii) {
             if (process.env.NODE_ENV === "development") {
               console.log(`[MSAL] ${message}`);
             }
@@ -105,7 +105,7 @@ export async function getAuthCodeUrl(state?: string): Promise<string> {
  * @param state - State parameter for validation
  * @returns Azure profile data
  */
-export async function handleCallback(code: string, state?: string): Promise<AzureProfile> {
+export async function handleCallback(code: string, _state?: string): Promise<AzureProfile> {
   const tokenRequest: msal.AuthorizationCodeRequest = {
     code: code,
     scopes: SCOPES,
@@ -150,7 +150,7 @@ export async function handleCallback(code: string, state?: string): Promise<Azur
  * @param idToken - ID token from Azure AD
  * @returns Decoded profile or null if invalid
  */
-export async function validateToken(idToken: string): Promise<AzureProfile | null> {
+export async function validateToken(_idToken: string): Promise<AzureProfile | null> {
   try {
     // For server-side validation, we'd typically verify the JWT signature
     // For now, we'll use MSAL's built-in validation

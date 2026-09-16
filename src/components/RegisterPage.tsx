@@ -79,20 +79,21 @@ export function RegisterPage({ onRegister, onShowLogin }: RegisterPageProps) {
       justifyContent: "center", 
       alignItems: "center", 
       minHeight: "100vh",
-      background: "#f5f5f5"
+      background: "var(--page)"
     }}>
       <div style={{
-        background: "white",
+        background: "var(--surface)",
         padding: "40px",
         borderRadius: "8px",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+        border: "1px solid var(--line)",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
         width: "100%",
         maxWidth: "400px"
       }}>
-        <h1 style={{ marginBottom: "10px", fontSize: "24px", color: "#333" }}>
+        <h1 style={{ marginBottom: "10px", fontSize: "24px", color: "var(--ink)" }}>
           Create Account
         </h1>
-        <p style={{ marginBottom: "30px", color: "#666", fontSize: "14px" }}>
+        <p style={{ marginBottom: "30px", color: "var(--muted)", fontSize: "14px" }}>
           Register for customer access to the portal
         </p>
 
@@ -208,12 +209,12 @@ export function RegisterPage({ onRegister, onShowLogin }: RegisterPageProps) {
             style={{
               width: "100%",
               padding: "12px",
-              background: "#0066cc",
-              color: "white",
+              background: "var(--accent-fill)",
+              color: "var(--accent-fill-ink)",
               border: "none",
               borderRadius: "4px",
               fontSize: "16px",
-              fontWeight: "500",
+              fontWeight: "700",
               cursor: loading ? "not-allowed" : "pointer",
               opacity: loading ? 0.7 : 1
             }}
@@ -223,7 +224,7 @@ export function RegisterPage({ onRegister, onShowLogin }: RegisterPageProps) {
         </form>
 
         <div style={{ marginTop: "20px", textAlign: "center", fontSize: "14px" }}>
-          <span style={{ color: "#666" }}>Already have an account? </span>
+          <span style={{ color: "var(--muted)" }}>Already have an account? </span>
           <button
             type="button"
             onClick={onShowLogin}
@@ -231,7 +232,7 @@ export function RegisterPage({ onRegister, onShowLogin }: RegisterPageProps) {
             style={{
               background: "none",
               border: "none",
-              color: "#0066cc",
+              color: "var(--accent)",
               cursor: "pointer",
               textDecoration: "underline",
               fontSize: "14px",

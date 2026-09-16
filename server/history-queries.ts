@@ -1,5 +1,5 @@
 import type { Queryable } from "./db.ts";
-import type { CallOrderSnapshot, StaffSnapshot, AuditLogEntry, HistoryTimelineEntry } from "../shared/types.ts";
+import type { CallOrderSnapshot, StaffSnapshot, AuditLogEntry } from "../shared/types.ts";
 
 /**
  * History query service for retrieving audit snapshots and building timelines.

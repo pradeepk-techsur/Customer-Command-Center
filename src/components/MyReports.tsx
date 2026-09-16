@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CallOrder, WeeklyReport, MonthlyReport, PortalSnapshot } from "../../shared/types.ts";
+import type { WeeklyReport, PortalSnapshot } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
 import { localDate, monthLabel } from "../lib/format.ts";
@@ -69,7 +69,7 @@ export function MyReports({ snapshot, userId, mutate, onNavigate }: {
   const draftCount = allWeeklyReports.filter(r => r.statusV2 === 'draft').length;
   
   const createMonthlyReport = (mode: "blank" | "draft") => {
-    mutate(() => api.createPmMonthly(newPeriod, mode)).then((s) => {
+    mutate(() => api.createPmMonthly(newPeriod, mode)).then(() => {
       setShowCreateModal(false);
       setNewPeriod(monthLabel());
     });

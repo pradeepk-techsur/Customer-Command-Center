@@ -9,8 +9,7 @@ import {
   authenticateRequest, 
   optionalAuth,
   requirePm, 
-  requireAdmin,
-  actorOf 
+  requireAdmin
 } from "./auth-middleware.ts";
 import { generateAccessToken, type User } from "./auth-service.ts";
 import { pool } from "./db.ts";
@@ -65,7 +64,7 @@ async function runTests() {
   app.use(express.json());
 
   // Test endpoints
-  app.get("/public", (req, res) => {
+  app.get("/public", (_req, res) => {
     res.json({ message: "Public endpoint" });
   });
 

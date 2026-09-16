@@ -30,6 +30,14 @@ services:
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
       - AZURE_REDIRECT_URI=http://localhost:3000/api/auth/microsoft/callback
+      # Email (magic-link / password reset / welcome emails) - set real values in .env
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER:-}
+      - EMAIL_PASS=${EMAIL_PASS:-}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@techsur.com}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - MAGIC_LINK_TOKEN_EXPIRY_MINUTES=${MAGIC_LINK_TOKEN_EXPIRY_MINUTES:-10}
     ports:
       - "3000:3000"
     volumes:

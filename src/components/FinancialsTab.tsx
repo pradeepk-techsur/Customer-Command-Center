@@ -4,6 +4,7 @@ import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
 import { burnColor, dateLabel, isStale, pctOf, rate, usd, usdFull } from "../lib/format.ts";
 import { Button, Field, SortHeaders, TextInput } from "./ui.tsx";
+import { ClinSection } from "./ClinSection.tsx";
 import type { Mutate } from "../App.tsx";
 
 const LCAT_COLS = [
@@ -92,6 +93,10 @@ export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: Cal
           <div /><div />
           <div className="right">{lcatTotal ? usd(lcatTotal) : "—"}</div>
         </div>
+      </div>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <ClinSection callOrderId={c.id} clins={c.clins} isPm={isPm} mutate={mutate} />
       </div>
     </div>
   );

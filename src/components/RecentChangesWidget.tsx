@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CallOrderSnapshot, StaffSnapshot, Role } from "../../shared/types.ts";
 import { getAccessToken } from "../api.ts";
-import { dateLabel } from "../lib/format.ts";
 
 interface RecentChange {
   snapshot: CallOrderSnapshot | StaffSnapshot;

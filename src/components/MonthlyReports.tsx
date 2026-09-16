@@ -4,8 +4,6 @@ import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
 import { dateLabel, fromEntries, lines, localDate, monthLabel, toEntries, usdFull } from "../lib/format.ts";
 import { Button, Eyebrow, Field, FileButton, SortHeaders, TextArea, TextInput } from "./ui.tsx";
-import { SubmissionDashboard } from "./SubmissionDashboard.tsx";
-import { ConsolidationWizard } from "./ConsolidationWizard.tsx";
 import type { Mutate } from "../App.tsx";
 
 const MSR_COLS = [
@@ -272,7 +270,3 @@ export function MonthlyReports({ snapshot, isPm, mutate }: { snapshot: PortalSna
   );
 }
 
-function numOrNull(v: string): number | null {
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
-  return isNaN(n) ? null : n;
-}

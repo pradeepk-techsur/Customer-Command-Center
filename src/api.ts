@@ -110,6 +110,9 @@ const files = (list: FileList | File[], extra: Record<string, string> = {}) => {
 };
 const enc = encodeURIComponent;
 
+/** "bpa" scope segment for BPA-level (call_order_id null) records. */
+const scope = (callOrderId: string | null) => enc(callOrderId ?? "bpa");
+
 export const api = {
   snapshot: () => request("/api/portal"),
   uploadCallOrders: (list: FileList) => request("/api/call-orders/upload", { method: "POST", body: files(list) }),
@@ -118,6 +121,86 @@ export const api = {
     request(`/api/call-orders/${enc(id)}/staff`, { method: "POST", body: json(input) }),
   setStaffStatus: (staffId: number, status: string) => request(`/api/staff/${staffId}`, { method: "PATCH", body: json({ status }) }),
   removeStaff: (staffId: number) => request(`/api/staff/${staffId}`, { method: "DELETE" }),
+
+  // CLINs
+  addClin: (callOrderId: string | null, input: { name: string; fundedAmount: string }) =>
+    request(`/api/scope/${scope(callOrderId)}/clins`, { method: "POST", body: json(input) }),
+  updateClin: (callOrderId: string | null, clinId: number, input: { name?: string; fundedAmount?: string }) =>
+    request(`/api/scope/${scope(callOrderId)}/clins/${clinId}`, { method: "PATCH", body: json(input) }),
+  removeClin: (callOrderId: string | null, clinId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/clins/${clinId}`, { method: "DELETE" }),
+  setClinMonthlySpend: (callOrderId: string | null, clinId: number, month: string, input: { projectedAmount?: string; actualAmount?: string }) =>
+    request(`/api/scope/${scope(callOrderId)}/clins/${clinId}/monthly-spend/${month}`, { method: "PUT", body: json(input) }),
+
+  // Invoices
+  addInvoice: (callOrderId: string | null, input: FormData) =>
+    request(`/api/scope/${scope(callOrderId)}/invoices`, { method: "POST", body: input }),
+  updateInvoice: (callOrderId: string | null, invoiceId: number, input: { paymentStatus?: string; paidDate?: string }) =>
+    request(`/api/scope/${scope(callOrderId)}/invoices/${invoiceId}`, { method: "PATCH", body: json(input) }),
+  removeInvoice: (callOrderId: string | null, invoiceId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/invoices/${invoiceId}`, { method: "DELETE" }),
+
+  // Contract documents (award + mods)
+  addContractDocument: (callOrderId: string | null, input: FormData) =>
+    request(`/api/scope/${scope(callOrderId)}/contract-documents`, { method: "POST", body: input }),
+  updateContractDocument: (callOrderId: string | null, documentId: number, input: Record<string, string>) =>
+    request(`/api/scope/${scope(callOrderId)}/contract-documents/${documentId}`, { method: "PATCH", body: json(input) }),
+  removeContractDocument: (callOrderId: string | null, documentId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/contract-documents/${documentId}`, { method: "DELETE" }),
+
+  // Deliverables
+  addDeliverable: (callOrderId: string | null, input: FormData) =>
+    request(`/api/scope/${scope(callOrderId)}/deliverables`, { method: "POST", body: input }),
+  updateDeliverable: (callOrderId: string | null, deliverableId: number, input: Record<string, string>) =>
+    request(`/api/scope/${scope(callOrderId)}/deliverables/${deliverableId}`, { method: "PATCH", body: json(input) }),
+  removeDeliverable: (callOrderId: string | null, deliverableId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/deliverables/${deliverableId}`, { method: "DELETE" }),
+
+  // Risks & Issues
+  addRisk: (callOrderId: string | null, input: { description: string; probability: string; impact: string; mitigation?: string }) =>
+    request(`/api/scope/${scope(callOrderId)}/risks-issues/risks`, { method: "POST", body: json(input) }),
+  updateRisk: (callOrderId: string | null, riskId: number, input: Record<string, string>) =>
+    request(`/api/scope/${scope(callOrderId)}/risks-issues/risks/${riskId}`, { method: "PATCH", body: json(input) }),
+  removeRisk: (callOrderId: string | null, riskId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/risks-issues/risks/${riskId}`, { method: "DELETE" }),
+  addIssue: (callOrderId: string | null, input: { description: string; assignedTo?: string }) =>
+    request(`/api/scope/${scope(callOrderId)}/risks-issues/issues`, { method: "POST", body: json(input) }),
+  updateIssue: (callOrderId: string | null, issueId: number, input: Record<string, string>) =>
+    request(`/api/scope/${scope(callOrderId)}/risks-issues/issues/${issueId}`, { method: "PATCH", body: json(input) }),
+  removeIssue: (callOrderId: string | null, issueId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/risks-issues/issues/${issueId}`, { method: "DELETE" }),
+
+  // Action items
+  addActionItem: (callOrderId: string | null, input: { name: string; description?: string; dateAssigned?: string; weeklyReportId?: number }) =>
+    request(`/api/scope/${scope(callOrderId)}/action-items`, { method: "POST", body: json(input) }),
+  updateActionItem: (callOrderId: string | null, actionItemId: number, input: Record<string, string>) =>
+    request(`/api/scope/${scope(callOrderId)}/action-items/${actionItemId}`, { method: "PATCH", body: json(input) }),
+  removeActionItem: (callOrderId: string | null, actionItemId: number) =>
+    request(`/api/scope/${scope(callOrderId)}/action-items/${actionItemId}`, { method: "DELETE" }),
+  async searchClosedActionItems(q: string) {
+    const res = await fetch(`/api/action-items/archive?q=${enc(q)}`, {
+      headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
+    });
+    if (!res.ok) throw new Error("Failed to search action items");
+    return res.json();
+  },
+
+  // Staffing
+  updateStaffContact: (staffId: number, input: Record<string, string>) =>
+    request(`/api/staffing/${staffId}/contact`, { method: "PATCH", body: json(input) }),
+  uploadPropertyReturn: (staffId: number, file: File) => {
+    const fd = new FormData(); fd.append("file", file);
+    return request(`/api/staffing/${staffId}/property-return`, { method: "POST", body: fd });
+  },
+  addStaffEquipment: (staffId: number, input: { makeModel: string; propertyTagNumber?: string }) =>
+    request(`/api/staffing/${staffId}/equipment`, { method: "POST", body: json(input) }),
+  removeStaffEquipment: (equipmentId: number) => request(`/api/staffing/equipment/${equipmentId}`, { method: "DELETE" }),
+  setLcatVacancyStatus: (lcatId: number, vacancyStatus: string) =>
+    request(`/api/staffing/labor-categories/${lcatId}/vacancy-status`, { method: "PATCH", body: json({ vacancyStatus }) }),
+  addStaffTransfer: (input: { staffId: number; toCallOrderId?: string; toLcat?: string; effectiveDate: string; notes?: string }) =>
+    request(`/api/staffing/transfers`, { method: "POST", body: json(input) }),
+  completeStaffTransfer: (transferId: number) => request(`/api/staffing/transfers/${transferId}/complete`, { method: "POST" }),
+  removeStaffTransfer: (transferId: number) => request(`/api/staffing/transfers/${transferId}`, { method: "DELETE" }),
   createWeekly: (id: string, input: WeeklyReportInput) => request(`/api/call-orders/${enc(id)}/weekly-reports`, { method: "POST", body: json(input) }),
   uploadWeekly: (id: string, list: FileList) => request(`/api/call-orders/${enc(id)}/weekly-reports/upload`, { method: "POST", body: files(list) }),
   editWeekly: (id: string, reportId: number, input: WeeklyReportInput) => request(`/api/call-orders/${enc(id)}/weekly-reports/${reportId}`, { method: "PUT", body: json(input) }),

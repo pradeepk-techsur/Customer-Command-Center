@@ -353,3 +353,268 @@ ALTER TABLE monthly_reports
 CREATE INDEX IF NOT EXISTS idx_monthly_reports_customer_visible
   ON monthly_reports(customer_visible, period_start DESC)
   WHERE customer_visible = true;
+
+-- ============================================================================
+-- Contract Tab: BPA record, CLINs, invoices, contract documents, deliverables
+-- ============================================================================
+
+-- The single BPA award. One row expected; replaces the hardcoded CONTRACT constant.
+create table if not exists contracts (
+  id         serial primary key,
+  name       text not null,
+  agency     text not null,
+  vehicle    text not null,
+  number     text not null,
+  pop_start  date,
+  pop_end    date,
+  funded     numeric(14,2) not null default 0,
+  spend      numeric(14,2) not null default 0,
+  eac        numeric(14,2),
+  created_at timestamptz not null default now()
+);
+
+-- CLINs. call_order_id NULL = BPA-level CLIN.
+create table if not exists clins (
+  id            serial primary key,
+  call_order_id text references call_orders(id) on delete cascade,
+  name          text not null,
+  funded_amount numeric(14,2) not null default 0,
+  sort_order    integer not null default 0,
+  created_at    timestamptz not null default now()
+);
+create index if not exists clins_call_order_idx on clins(call_order_id);
+
+-- Monthly projected/actual spend per CLIN, drives the spend line graph.
+create table if not exists clin_monthly_spend (
+  id                 serial primary key,
+  clin_id            integer not null references clins(id) on delete cascade,
+  month              date not null,             -- first of month
+  projected_amount   numeric(14,2),
+  actual_amount      numeric(14,2),
+  unique (clin_id, month)
+);
+create index if not exists clin_monthly_spend_clin_idx on clin_monthly_spend(clin_id, month);
+
+-- Invoices. call_order_id NULL = BPA-level invoice.
+create table if not exists invoices (
+  id             serial primary key,
+  call_order_id  text references call_orders(id) on delete cascade,
+  invoice_number text not null,
+  invoice_date   date not null,
+  amount         numeric(14,2) not null,
+  period_start   date,
+  period_end     date,
+  payment_status text not null default 'unpaid' check (payment_status in ('unpaid', 'paid')),
+  paid_date      date,
+  file_href      text,
+  created_at     timestamptz not null default now()
+);
+create index if not exists invoices_call_order_idx on invoices(call_order_id);
+
+-- Award document + contract mods. call_order_id NULL = BPA-level document.
+create table if not exists contract_documents (
+  id                   serial primary key,
+  call_order_id        text references call_orders(id) on delete cascade,
+  name                 text not null,
+  file_href            text,
+  is_admin_mod         boolean not null default false,
+  is_funding_mod       boolean not null default false,
+  funding_change_amount numeric(14,2),
+  pop_period_label     text,                    -- e.g. "Base", "Option 1"
+  effective_date       date,
+  sort_order           integer not null default 0,
+  created_at           timestamptz not null default now()
+);
+create index if not exists contract_documents_call_order_idx on contract_documents(call_order_id);
+
+-- Contractual deliverables. Link is either an uploaded file or an external URL (e.g. AO SharePoint).
+create table if not exists deliverables (
+  id                serial primary key,
+  call_order_id     text references call_orders(id) on delete cascade,
+  name              text not null,
+  link_type         text not null check (link_type in ('file', 'url')),
+  file_href         text,
+  url               text,
+  due_date          date,
+  delivery_date     date,
+  status            text not null default 'pending' check (status in ('pending', 'delivered', 'accepted')),
+  sort_order        integer not null default 0,
+  created_at        timestamptz not null default now()
+);
+create index if not exists deliverables_call_order_idx on deliverables(call_order_id);
+
+-- ============================================================================
+-- Risks, Issues, Action Items
+-- ============================================================================
+
+-- call_order_id NULL = BPA-level risk.
+create table if not exists risks (
+  id           serial primary key,
+  call_order_id text references call_orders(id) on delete cascade,
+  description  text not null,
+  probability  text not null check (probability in ('low', 'medium', 'high')),
+  impact       text not null check (impact in ('low', 'medium', 'high')),
+  mitigation   text,
+  status       text not null default 'open' check (status in ('open', 'closed')),
+  created_at   timestamptz not null default now(),
+  closed_at    timestamptz
+);
+create index if not exists risks_call_order_idx on risks(call_order_id);
+
+-- call_order_id NULL = BPA-level issue.
+create table if not exists issues (
+  id                serial primary key,
+  call_order_id     text references call_orders(id) on delete cascade,
+  description       text not null,
+  date_identified   date not null default current_date,
+  assigned_to       text,
+  status            text not null default 'open' check (status in ('open', 'closed')),
+  updates_narrative jsonb not null default '[]'::jsonb,  -- [{date, text}]
+  created_at        timestamptz not null default now(),
+  closed_at         timestamptz
+);
+create index if not exists issues_call_order_idx on issues(call_order_id);
+
+-- Action items live under a weekly report (per call order) or standalone at the BPA level.
+create table if not exists action_items (
+  id                serial primary key,
+  weekly_report_id  integer references weekly_reports(id) on delete cascade,
+  call_order_id     text references call_orders(id) on delete cascade,
+  name              text not null,
+  description       text,
+  date_assigned     date not null default current_date,
+  status            text not null default 'open' check (status in ('open', 'closed')),
+  created_at        timestamptz not null default now(),
+  closed_at         timestamptz
+);
+create index if not exists action_items_call_order_idx on action_items(call_order_id);
+create index if not exists action_items_weekly_report_idx on action_items(weekly_report_id);
+
+-- ============================================================================
+-- Mission Control Slice 1: Approved-user allowlist, magic-link auth, auth events
+-- ============================================================================
+
+-- Password-free customer allowlist. Managed by program_manager and pm roles (Paul, Aiden, Jessica) per decision #4.
+create table if not exists approved_users (
+  id           serial primary key,
+  email        text not null unique,
+  name         text not null,
+  role         text not null default 'customer' check (role in ('customer', 'pm', 'program_manager')),
+  added_by_user_id integer references users(id) on delete set null,
+  status       text not null default 'active' check (status in ('active', 'revoked')),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create unique index if not exists approved_users_email_idx on approved_users(lower(email));
+
+-- Single-use magic-link tokens. Only a hash of the token is stored (never the plaintext token).
+create table if not exists magic_link_tokens (
+  id              serial primary key,
+  approved_user_id integer not null references approved_users(id) on delete cascade,
+  token_hash      text not null unique,
+  expires_at      timestamptz not null,
+  used_at         timestamptz,
+  requested_ip    text,
+  created_at      timestamptz not null default now()
+);
+create index if not exists magic_link_tokens_expires_idx on magic_link_tokens(expires_at);
+create index if not exists magic_link_tokens_approved_user_idx on magic_link_tokens(approved_user_id);
+
+-- Authentication/security event log. Never visible to customer-role users (§19.4/§19.5).
+create table if not exists authentication_events (
+  id            bigserial primary key,
+  event_type    text not null check (event_type in (
+                   'magic_link_requested', 'magic_link_approved', 'magic_link_rejected',
+                   'magic_link_issued', 'magic_link_used', 'magic_link_reuse_attempt',
+                   'magic_link_expired_attempt', 'magic_link_invalid_attempt',
+                   'sso_success', 'sso_failure', 'session_start', 'session_end'
+                 )),
+  email         text,                 -- the address attempted, when applicable (privacy-minimizing; no raw token)
+  user_id       integer references users(id) on delete set null,
+  role_assigned text,
+  ip_address    text,
+  details       jsonb,
+  occurred_at   timestamptz not null default now()
+);
+create index if not exists authentication_events_type_idx on authentication_events(event_type);
+create index if not exists authentication_events_email_idx on authentication_events(email);
+create index if not exists authentication_events_time_idx on authentication_events(occurred_at desc);
+
+-- Configuration-driven risk severity matrix (§14). Seeded with the standard 3x3 IT-program matrix (decision #3);
+-- not hardcoded, so it can be edited without a deploy.
+create table if not exists risk_severity_matrix (
+  probability text not null check (probability in ('low', 'medium', 'high')),
+  impact      text not null check (impact in ('low', 'medium', 'high')),
+  severity    text not null check (severity in ('low', 'medium', 'high')),
+  primary key (probability, impact)
+);
+insert into risk_severity_matrix (probability, impact, severity) values
+  ('low', 'low', 'low'), ('low', 'medium', 'low'), ('low', 'high', 'medium'),
+  ('medium', 'low', 'low'), ('medium', 'medium', 'medium'), ('medium', 'high', 'high'),
+  ('high', 'low', 'medium'), ('high', 'medium', 'high'), ('high', 'high', 'high')
+on conflict (probability, impact) do nothing;
+
+-- Lock/correct authority for weekly reports (§17.7, decision #10): program_manager always has it;
+-- this flag lets Paul designate additional lockers without granting them the full program_manager role.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'users' and column_name = 'can_lock_reports') then
+    alter table users add column can_lock_reports boolean not null default false;
+  end if;
+end $$;
+-- Staffing overhaul: onboarding, equipment, transfers
+-- ============================================================================
+
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'staff' and column_name = 'ao_email') then
+    alter table staff add column ao_email text;
+    alter table staff add column phone text;
+    alter table staff add column start_date date;
+    alter table staff add column end_date date;
+    alter table staff add column offer_accepted_date date;
+    alter table staff add column of306_submitted_date date;
+    alter table staff add column fingerprints_complete_date date;
+    alter table staff add column laptop_received_date date;
+    alter table staff add column piv_issued_date date;
+    alter table staff add column property_return_doc_href text;
+  end if;
+end $$;
+
+-- Supports more than one laptop per person (generally one, but not always).
+create table if not exists staff_equipment (
+  id                   serial primary key,
+  staff_id             integer not null references staff(id) on delete cascade,
+  make_model           text not null,
+  property_tag_number  text,
+  created_at           timestamptz not null default now()
+);
+create index if not exists staff_equipment_staff_idx on staff_equipment(staff_id);
+
+-- Planned or completed LCAT/call-order moves, tracked separately since moves can be future-dated.
+create table if not exists staff_transfers (
+  id                serial primary key,
+  staff_id          integer not null references staff(id) on delete cascade,
+  from_call_order_id text references call_orders(id) on delete set null,
+  from_lcat         text,
+  to_call_order_id  text references call_orders(id) on delete set null,
+  to_lcat           text,
+  effective_date    date not null,
+  notes             text,
+  status            text not null default 'pending' check (status in ('pending', 'completed')),
+  created_at        timestamptz not null default now(),
+  completed_at      timestamptz
+);
+create index if not exists staff_transfers_staff_idx on staff_transfers(staff_id);
+
+-- Tracks whether an open billet is being sourced, on hold, or has a resource onboarding.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'labor_categories' and column_name = 'vacancy_status') then
+    alter table labor_categories add column vacancy_status text check (vacancy_status in ('sourcing', 'on_hold', 'onboarding'));
+  end if;
+end $$;
+
+-- Free-text deliverable category (e.g. "Monthly Status Report") and the reporting month/year it covers.
+ALTER TABLE deliverables ADD COLUMN IF NOT EXISTS category text;
+ALTER TABLE deliverables ADD COLUMN IF NOT EXISTS period_label text;
