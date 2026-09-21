@@ -1,6 +1,6 @@
 /**
  * Approved-user allowlist management (magic-link sign-in). Per spec decision #4,
- * Paul, Aiden, and Jessica (pm + program_manager + admin) can all manage this list.
+ * Paul, Aidan, and Jessica (pm + program_manager + admin) can all manage this list.
  */
 
 import express from "express";

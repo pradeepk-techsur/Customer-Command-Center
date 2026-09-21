@@ -4,6 +4,7 @@ import { authenticateRequest, requirePm } from "../auth-middleware.ts";
 import { audit, mutation, num, str, bool, callOrderIdParam, requireScopedCallOrderAccess } from "../route-helpers.ts";
 import { upload } from "../uploads.ts";
 import { parseContractDocument } from "../contract-document-parser.ts";
+import { captureContractDocumentSnapshot } from "../snapshot-history.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(authenticateRequest, requirePm, requireScopedCallOrderAccess);
@@ -30,6 +31,8 @@ router.post("/", upload.single("file"), mutation(async (db, req, res) => {
      isFundingMod ? (parsed.fundingChangeAmount ?? num(req.body?.fundingChangeAmount)) : null,
      parsed.popPeriodLabel ?? str(req.body?.popPeriodLabel), parsed.effectiveDate ?? str(req.body?.effectiveDate)],
   );
+  // Contract documents can be BPA-level (callOrderId null) — history is only tracked per call order.
+  if (callOrderId) await captureContractDocumentSnapshot(db, callOrderId, req.user?.id ?? null, "add", rows[0].id, `Uploaded ${name}`);
   await audit(db, req, "contract_document.create", "contract_document", rows[0].id, { callOrderId, name });
 }));
 
@@ -38,6 +41,7 @@ router.patch("/:documentId", mutation(async (db, req, res) => {
   const doc = rows[0];
   if (!doc) { res.status(404).json({ error: "Document not found." }); return false; }
   const isFundingMod = req.body?.isFundingMod !== undefined ? bool(req.body.isFundingMod) : doc.is_funding_mod;
+  if (doc.call_order_id) await captureContractDocumentSnapshot(db, doc.call_order_id, req.user?.id ?? null, "update", doc.id, `Updated ${doc.name}`);
   await db.query(
     `update contract_documents set name = $2, is_admin_mod = $3, is_funding_mod = $4, funding_change_amount = $5, pop_period_label = $6, effective_date = $7
      where id = $1`,
@@ -49,6 +53,9 @@ router.patch("/:documentId", mutation(async (db, req, res) => {
 }));
 
 router.delete("/:documentId", mutation(async (db, req, res) => {
+  const { rows: existing } = await db.query("select * from contract_documents where id = $1", [req.params.documentId]);
+  const existingDoc = existing[0];
+  if (existingDoc?.call_order_id) await captureContractDocumentSnapshot(db, existingDoc.call_order_id, req.user?.id ?? null, "delete", existingDoc.id, `Removed ${existingDoc.name}`);
   const { rows } = await db.query("delete from contract_documents where id = $1 returning *", [req.params.documentId]);
   if (!rows[0]) { res.status(404).json({ error: "Document not found." }); return false; }
   await audit(db, req, "contract_document.delete", "contract_document", rows[0].id, { name: rows[0].name });

@@ -494,7 +494,7 @@ create index if not exists action_items_weekly_report_idx on action_items(weekly
 -- Mission Control Slice 1: Approved-user allowlist, magic-link auth, auth events
 -- ============================================================================
 
--- Password-free customer allowlist. Managed by program_manager and pm roles (Paul, Aiden, Jessica) per decision #4.
+-- Password-free customer allowlist. Managed by program_manager and pm roles (Paul, Aidan, Jessica) per decision #4.
 create table if not exists approved_users (
   id           serial primary key,
   email        text not null unique,
@@ -618,3 +618,39 @@ end $$;
 -- Free-text deliverable category (e.g. "Monthly Status Report") and the reporting month/year it covers.
 ALTER TABLE deliverables ADD COLUMN IF NOT EXISTS category text;
 ALTER TABLE deliverables ADD COLUMN IF NOT EXISTS period_label text;
+
+-- Free-text description shown on the call order's General tab.
+ALTER TABLE call_orders ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
+
+-- Labor category snapshots: same pattern as staff_snapshots, captures full LCAT list at each change.
+create table if not exists labor_category_snapshots (
+  id                bigserial primary key,
+  call_order_id     text not null references call_orders(id) on delete cascade,
+  snapshot_time     timestamptz not null default now(),
+  -- Labor category list as JSONB array: [{id, name, fte, hours, rate, sort_order}]
+  labor_categories  jsonb not null default '[]'::jsonb,
+  created_by_user_id integer references users(id),
+  change_reason      text,
+  change_type        text,  -- 'add' | 'update' | 'delete'
+  changed_lcat_id    integer,
+  created_at        timestamptz not null default now()
+);
+create index if not exists labor_category_snapshots_call_order_idx on labor_category_snapshots(call_order_id, snapshot_time desc);
+
+-- Contract document snapshots: same pattern, captures full contract-file list at each change
+-- (uploads, and PM corrections to mis-parsed PoP grouping / admin vs funding mod classification).
+create table if not exists contract_document_snapshots (
+  id                bigserial primary key,
+  call_order_id     text not null references call_orders(id) on delete cascade,
+  snapshot_time     timestamptz not null default now(),
+  -- Contract document list as JSONB array: [{id, name, isAdminMod, isFundingMod, fundingChangeAmount, popPeriodLabel, effectiveDate, sortOrder}]
+  contract_documents jsonb not null default '[]'::jsonb,
+  created_by_user_id integer references users(id),
+  change_reason      text,
+  change_type        text,  -- 'add' | 'update' | 'delete'
+  changed_document_id integer,
+  created_at        timestamptz not null default now()
+);
+create index if not exists contract_document_snapshots_call_order_idx on contract_document_snapshots(call_order_id, snapshot_time desc);
+-- Offboarding: date equipment was physically returned, separate from the property return document upload.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS equipment_returned_date date;

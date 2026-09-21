@@ -10,7 +10,7 @@ import { actorOf, requirePm } from "./auth.ts";
 import { authenticateRequest, requireCallOrderAccess, getAccessibleCallOrders, requireProgramManager, requireLockAuthority } from "./auth-middleware.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { captureCallOrderSnapshot, captureStaffSnapshot } from "./snapshot-history.ts";
-import { dayLabel, firstOfMonth, monthLabel, toIsoDate } from "./dates.ts";
+import { dayLabel, firstOfMonth, formatPop, monthLabel, toIsoDate } from "./dates.ts";
 import type { MsrSectionInput, WeeklyReportInput } from "../shared/types.ts";
 import { WEEKLY_SECTIONS } from "../shared/types.ts";
 import type pg from "pg";
@@ -52,7 +52,7 @@ app.use("/api/auth", authRouter);
 // Mount admin routes (requires admin role)
 app.use("/api/admin", adminRouter);
 
-// Approved-user (magic-link allowlist) management: Paul, Aiden, and Jessica (pm/program_manager/admin) all manage this.
+// Approved-user (magic-link allowlist) management: Paul, Aidan, and Jessica (pm/program_manager/admin) all manage this.
 app.use("/api/approved-users", approvedUsersRouter);
 
 // Security/authentication event log: never visible to customer-role users (spec §19.4/§19.5).
@@ -97,6 +97,10 @@ const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
   return isNaN(n) ? null : n;
+};
+const str = (v: unknown): string | null => {
+  const s = String(v ?? "").trim();
+  return s ? s : null;
 };
 const orNA = (xs: string[]) => (xs.length ? xs : ["N/A"]);
 
@@ -173,6 +177,76 @@ app.patch("/api/call-orders/:id/spend", authenticateRequest, requirePm, requireC
   await audit(db, req, "call_order.spend", "call_order", c.id, { from: c.spend, to: spend });
 }));
 
+// Description belongs to the call order (not a single funded period), so it applies to every period sharing this group.
+app.patch("/api/call-orders/:id/description", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
+  const c = await callOrderOr404(db, req.params.id as string, res);
+  if (!c) return false;
+  const description = String(req.body?.description ?? "").trim();
+  await db.query("update call_orders set description = $2 where group_key = $1", [c.group_key, description]);
+  await audit(db, req, "call_order.description", "call_order", c.id, { groupKey: c.group_key, from: c.description, to: description });
+}));
+
+// Edits period-of-performance dates, funding, and PM for a single funded period. Also finishes
+// setup (clears `pending`) once dates and a funded amount have been entered for an uploaded call order.
+app.patch("/api/call-orders/:id/setup", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
+  const c = await callOrderOr404(db, req.params.id as string, res);
+  if (!c) return false;
+  const popStart = str(req.body?.popStart) ?? c.pop_start;
+  const popEnd = str(req.body?.popEnd) ?? c.pop_end;
+  if (popStart && popEnd && popEnd < popStart) {
+    res.status(400).json({ error: "Period of performance end date must be after the start date." });
+    return false;
+  }
+  const funded = req.body?.funded !== undefined ? num(req.body.funded) : c.funded;
+  const eac = req.body?.eac !== undefined ? num(req.body.eac) : c.eac;
+  const overUnder = req.body?.overUnder !== undefined ? num(req.body.overUnder) : c.over_under;
+  const pm = str(req.body?.pm) ?? c.pm;
+  if (funded === null || funded < 0) { res.status(400).json({ error: "Funded amount must be a non-negative amount." }); return false; }
+  const popLabel = formatPop(popStart, popEnd);
+  const nowComplete = c.pending && !!popStart && !!popEnd && funded > 0;
+
+  await captureCallOrderSnapshot(db, c.id, req.user?.id ?? null, "Call order setup updated", ["funded", "eac", "over_under", "pop_start", "pop_end", "pm"]);
+  await db.query(
+    `update call_orders set pop_label = $2, pop_start = $3, pop_end = $4, funded = $5, eac = $6, over_under = $7, pm = $8,
+       pending = $9, fin_updated_on = current_date where id = $1`,
+    [c.id, popLabel, popStart, popEnd, funded, eac, overUnder, pm, nowComplete ? false : c.pending],
+  );
+  await audit(db, req, "call_order.setup", "call_order", c.id, { popStart, popEnd, funded, eac, overUnder, pm, completedSetup: nowComplete });
+}));
+
+/** "Call 13" + [Call 13.1, Call 13.2] -> "Call 13.3"; "Call 17" + [Call 17] -> "Call 17.1". */
+function nextPeriodId(base: number, existingIds: string[]): string {
+  const suffixes = existingIds.map((id) => {
+    const m = String(id).match(/\.(\d+)$/);
+    return m ? +m[1] : 0;
+  });
+  return `Call ${base}.${Math.max(...suffixes, 0) + 1}`;
+}
+
+// Adds a new funded period (e.g. an option year) under the same call order group.
+app.post("/api/call-orders/:groupKey/periods", authenticateRequest, requirePm, mutation(async (db, req, res) => {
+  const groupKey = req.params.groupKey as string;
+  const { rows: siblings } = await db.query("select * from call_orders where group_key = $1 order by sort_order, created_at", [groupKey]);
+  const sibling = siblings[0];
+  if (!sibling) { res.status(404).json({ error: "Call order group not found." }); return false; }
+
+  const popStart = str(req.body?.popStart);
+  const popEnd = str(req.body?.popEnd);
+  if (!popStart || !popEnd) { res.status(400).json({ error: "Period start and end dates are required." }); return false; }
+  if (popEnd < popStart) { res.status(400).json({ error: "Period of performance end date must be after the start date." }); return false; }
+  const funded = num(req.body?.funded) ?? 0;
+
+  const base = +(String(groupKey).match(/(\d+)/)?.[1] ?? "0");
+  const newId = nextPeriodId(base, siblings.map((s) => s.id));
+
+  await db.query(
+    `insert into call_orders (id, group_key, group_name, name, description, pop_label, pop_start, pop_end, funded, spend, pm, pending, highlights, sort_order)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10,false,'[]'::jsonb, coalesce((select max(sort_order) + 1 from call_orders where group_key = $2), 0))`,
+    [newId, groupKey, sibling.group_name, sibling.name, sibling.description, formatPop(popStart, popEnd), popStart, popEnd, funded, sibling.pm],
+  );
+  await audit(db, req, "call_order.period.create", "call_order", newId, { groupKey, popStart, popEnd, funded });
+}));
+
 // ---- Staff -------------------------------------------------------------------------------------
 
 app.post("/api/call-orders/:id/staff", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
@@ -212,13 +286,29 @@ app.patch("/api/staff/:id", authenticateRequest, requirePm, async (req, res, nex
   const { rows } = await db.query("select * from staff where id = $1", [req.params.id]);
   const s = rows[0];
   if (!s) { res.status(404).json({ error: "Staff record not found." }); return false; }
-  const status = String(req.body?.status || "").trim();
-  if (!status) { res.status(400).json({ error: "A status is required." }); return false; }
-  // Capture snapshot before update
-  await captureStaffSnapshot(db, s.call_order_id, req.user?.id ?? null, 'update', s.id, `Status changed: ${s.name} from ${s.status} to ${status}`);
-  await db.query("update staff set status = $2 where id = $1", [s.id, status]);
+
+  // Status-only update (existing behavior, e.g. the roster status dropdown).
+  if (req.body?.status !== undefined && req.body?.name === undefined && req.body?.laborCategory === undefined && req.body?.rate === undefined) {
+    const status = String(req.body.status || "").trim();
+    if (!status) { res.status(400).json({ error: "A status is required." }); return false; }
+    await captureStaffSnapshot(db, s.call_order_id, req.user?.id ?? null, 'update', s.id, `Status changed: ${s.name} from ${s.status} to ${status}`);
+    await db.query("update staff set status = $2 where id = $1", [s.id, status]);
+    await db.query("update call_orders set people_updated_on = current_date where id = $1", [s.call_order_id]);
+    await audit(db, req, "staff.status", "staff", s.id, { callOrderId: s.call_order_id, name: s.name, from: s.status, to: status });
+    return;
+  }
+
+  // Full record edit (name/labor category/rate/status) — lets a PM correct a vacant/placeholder row
+  // in place (e.g. Alisa Welch filling a "VACANT" slot) or record an LCAT/rate change without
+  // deleting and re-adding the person, which would lose their onboarding history.
+  const name = String(req.body?.name ?? s.name).trim() || s.name;
+  const laborCategory = String(req.body?.laborCategory ?? s.labor_category).trim() || s.labor_category;
+  const rate = req.body?.rate !== undefined ? (num(req.body.rate) ?? s.rate) : s.rate;
+  const status = String(req.body?.status ?? s.status).trim() || s.status;
+  await captureStaffSnapshot(db, s.call_order_id, req.user?.id ?? null, 'update', s.id, `Record updated for ${s.name}`);
+  await db.query("update staff set name = $2, labor_category = $3, rate = $4, status = $5 where id = $1", [s.id, name, laborCategory, rate, status]);
   await db.query("update call_orders set people_updated_on = current_date where id = $1", [s.call_order_id]);
-  await audit(db, req, "staff.status", "staff", s.id, { callOrderId: s.call_order_id, name: s.name, from: s.status, to: status });
+  await audit(db, req, "staff.update", "staff", s.id, { callOrderId: s.call_order_id, from: { name: s.name, laborCategory: s.labor_category, rate: s.rate, status: s.status }, to: { name, laborCategory, rate, status } });
 }));
 
 app.delete("/api/staff/:id", authenticateRequest, requirePm, async (req, res, next) => {
@@ -252,7 +342,7 @@ app.delete("/api/staff/:id", authenticateRequest, requirePm, async (req, res, ne
 
 // ---- Audit History & Snapshots -----------------------------------------------------------------
 
-import { getCallOrderHistory, getStaffHistory, getCallOrderAtDate, compareCallOrderStates, getRecentChanges, getAuditReport } from "./history-queries.ts";
+import { getCallOrderHistory, getStaffHistory, getLcatHistory, getContractDocumentHistory, getCallOrderAtDate, compareCallOrderStates, getRecentChanges, getAuditReport } from "./history-queries.ts";
 import { hasCallOrderAccess } from "./auth-middleware.ts";
 
 // Get full history timeline for a call order
@@ -265,12 +355,14 @@ app.get("/api/call-orders/:id/history", authenticateRequest, requireCallOrderAcc
   const includeUserInfo = req.user!.role !== 'customer';
   
   try {
-    const [coHistory, staffHistory] = await Promise.all([
+    const [coHistory, staffHistory, lcatHistory, contractDocumentHistory] = await Promise.all([
       getCallOrderHistory(pool, callOrderId, startDate, endDate, includeUserInfo),
-      getStaffHistory(pool, callOrderId, startDate, endDate, includeUserInfo)
+      getStaffHistory(pool, callOrderId, startDate, endDate, includeUserInfo),
+      getLcatHistory(pool, callOrderId, startDate, endDate, includeUserInfo),
+      getContractDocumentHistory(pool, callOrderId, startDate, endDate, includeUserInfo)
     ]);
     
-    res.json({ callOrderHistory: coHistory, staffHistory });
+    res.json({ callOrderHistory: coHistory, staffHistory, lcatHistory, contractDocumentHistory });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

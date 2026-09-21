@@ -21,6 +21,13 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
   // Accordion: both sections start open; collapsing either reclaims vertical space on long rosters.
   const [openRoster, setOpenRoster] = useState(true);
   const [openSourcing, setOpenSourcing] = useState(true);
+  // Editing a roster row in place — lets a PM fill a vacant slot or correct an LCAT/rate without
+  // deleting and re-adding the person (which would lose their onboarding/equipment history).
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", laborCategory: "", rate: "" });
+  const startEdit = (s: StaffMember) => { setEditingId(s.id); setEditForm({ name: s.name, laborCategory: s.laborCategory, rate: String(s.rate) }); };
+  const cancelEdit = () => { setEditingId(null); };
+  const saveEdit = (staffId: number) => mutate(() => api.updateStaff(staffId, editForm)).then(() => setEditingId(null));
   const { sorted, cur, toggle } = useSort("staff", "name", c.staff, {
     name: (s) => s.name, lcat: (s) => s.laborCategory, rate: (s) => s.rate, status: (s) => s.status,
   });
@@ -33,7 +40,7 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
     { label: "Departed", value: c.staff.filter((s) => isDeparted(s.status)).length },
     { label: "Labor categories", value: new Set(c.laborCategories.map((l) => l.name)).size || "—" },
   ];
-  const cols = isPm ? "1.5fr 1.5fr 0.7fr 1fr 0.5fr" : "1.6fr 1.6fr 0.8fr 0.8fr";
+  const cols = isPm ? "1.5fr 1.5fr 0.7fr 1fr 0.6fr 0.5fr" : "1.6fr 1.6fr 0.8fr 0.8fr";
 
   const addPerson = () => {
     if (!ns.name.trim()) return;
@@ -58,11 +65,27 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
           <>
             <div className="grid thead" style={{ gridTemplateColumns: cols, padding: "10px 20px" }}>
               <SortHeaders cols={STAFF_COLS} cur={cur} onSort={toggle} />
+              {isPm && <div className="th static right">Edit</div>}
               {isPm && <div className="th static right">Remove</div>}
             </div>
             {sorted.map((s) => {
               // A stored status outside the vocabulary (a free-text note) stays selectable so it is never overwritten by accident.
               const options = STATUS_OPTIONS.includes(s.status) ? STATUS_OPTIONS : [s.status, ...STATUS_OPTIONS];
+              if (isPm && editingId === s.id) {
+                return (
+                  <div key={s.id} className="add-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
+                    <div className="two-col">
+                      <Field label="Name"><TextInput value={editForm.name} onChange={(v) => setEditForm({ ...editForm, name: v })} /></Field>
+                      <Field label="Labor category"><TextInput value={editForm.laborCategory} onChange={(v) => setEditForm({ ...editForm, laborCategory: v })} /></Field>
+                    </div>
+                    <Field label="Rate" style={{ width: 140 }}><TextInput value={editForm.rate} onChange={(v) => setEditForm({ ...editForm, rate: v })} /></Field>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <Button primary onClick={() => saveEdit(s.id)}>Save</Button>
+                      <Button onClick={cancelEdit}>Cancel</Button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={s.id} className="grid trow roster" style={{ gridTemplateColumns: cols }}>
                   {onSelectStaff ? (
@@ -77,6 +100,7 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
                       <select className="select" value={s.status} onChange={(e) => mutate(() => api.setStaffStatus(s.id, e.target.value))}>
                         {options.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
+                      <button type="button" className="link-text right" onClick={() => startEdit(s)}>Edit</button>
                       <button type="button" className="remove-btn" title="Remove person" onClick={() => mutate(() => api.removeStaff(s.id))}>×</button>
                     </>
                   ) : (

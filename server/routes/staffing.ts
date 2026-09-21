@@ -1,8 +1,8 @@
 import express from "express";
 import { authenticateRequest, requirePm, hasCallOrderAccess } from "../auth-middleware.ts";
 import { pool } from "../db.ts";
-import { audit, mutation, str } from "../route-helpers.ts";
-import { captureStaffSnapshot } from "../snapshot-history.ts";
+import { audit, mutation, num, str } from "../route-helpers.ts";
+import { captureStaffSnapshot, captureLcatSnapshot } from "../snapshot-history.ts";
 import { upload } from "../uploads.ts";
 
 const router = express.Router();
@@ -16,6 +16,7 @@ const ONBOARDING_FIELDS: Record<string, string> = {
   pivIssuedDate: "piv_issued_date",
   startDate: "start_date",
   endDate: "end_date",
+  equipmentReturnedDate: "equipment_returned_date",
 };
 
 async function staffOr404(req: express.Request, res: express.Response) {
@@ -83,6 +84,52 @@ router.delete("/equipment/:equipmentId", mutation(async (db, req, res) => {
   if (!hasAccess) { res.status(403).json({ error: "Access denied" }); return false; }
   await db.query("delete from staff_equipment where id = $1", [e.id]);
   await audit(db, req, "staff_equipment.delete", "staff_equipment", e.id, { staffId: e.staff_id });
+}));
+
+// ---- Labor categories -------------------------------------------------------------------------
+
+router.post("/call-orders/:callOrderId/labor-categories", mutation(async (db, req, res) => {
+  const callOrderId = req.params.callOrderId as string;
+  const hasAccess = await hasCallOrderAccess(pool, req.user!.id, req.user!.role, callOrderId);
+  if (!hasAccess) { res.status(403).json({ error: "Access denied" }); return false; }
+  const name = str(req.body?.name);
+  if (!name) { res.status(400).json({ error: "A labor category name is required." }); return false; }
+  const fte = num(req.body?.fte) ?? 0;
+  const hours = num(req.body?.hours) ?? 0;
+  const rate = num(req.body?.rate) ?? 0;
+  const { rows } = await db.query<{ id: number }>(
+    `insert into labor_categories (call_order_id, name, fte, hours, rate, sort_order)
+     values ($1,$2,$3,$4,$5, coalesce((select max(sort_order) + 1 from labor_categories where call_order_id = $1), 0)) returning id`,
+    [callOrderId, name, fte, hours, rate],
+  );
+  await captureLcatSnapshot(db, callOrderId, req.user?.id ?? null, "add", rows[0].id, `Added ${name}`);
+  await audit(db, req, "labor_category.add", "labor_category", rows[0].id, { callOrderId, name, fte, hours, rate });
+}));
+
+router.patch("/labor-categories/:lcatId", mutation(async (db, req, res) => {
+  const { rows } = await db.query("select * from labor_categories where id = $1", [req.params.lcatId]);
+  const l = rows[0];
+  if (!l) { res.status(404).json({ error: "Labor category not found." }); return false; }
+  const hasAccess = await hasCallOrderAccess(pool, req.user!.id, req.user!.role, l.call_order_id);
+  if (!hasAccess) { res.status(403).json({ error: "Access denied" }); return false; }
+  const name = str(req.body?.name) ?? l.name;
+  const fte = req.body?.fte !== undefined ? (num(req.body.fte) ?? l.fte) : l.fte;
+  const hours = req.body?.hours !== undefined ? (num(req.body.hours) ?? l.hours) : l.hours;
+  const rate = req.body?.rate !== undefined ? (num(req.body.rate) ?? l.rate) : l.rate;
+  await captureLcatSnapshot(db, l.call_order_id, req.user?.id ?? null, "update", l.id, `Updated ${l.name}`);
+  await db.query("update labor_categories set name = $2, fte = $3, hours = $4, rate = $5 where id = $1", [l.id, name, fte, hours, rate]);
+  await audit(db, req, "labor_category.update", "labor_category", l.id, { callOrderId: l.call_order_id, name, fte, hours, rate });
+}));
+
+router.delete("/labor-categories/:lcatId", mutation(async (db, req, res) => {
+  const { rows } = await db.query("select * from labor_categories where id = $1", [req.params.lcatId]);
+  const l = rows[0];
+  if (!l) { res.status(404).json({ error: "Labor category not found." }); return false; }
+  const hasAccess = await hasCallOrderAccess(pool, req.user!.id, req.user!.role, l.call_order_id);
+  if (!hasAccess) { res.status(403).json({ error: "Access denied" }); return false; }
+  await captureLcatSnapshot(db, l.call_order_id, req.user?.id ?? null, "delete", l.id, `Removed ${l.name}`);
+  await db.query("delete from labor_categories where id = $1", [l.id]);
+  await audit(db, req, "labor_category.remove", "labor_category", l.id, { callOrderId: l.call_order_id, name: l.name });
 }));
 
 // ---- Vacancy status (labor_categories) ------------------------------------------------------

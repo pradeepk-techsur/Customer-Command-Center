@@ -132,6 +132,100 @@ export async function captureStaffSnapshot(
 }
 
 /**
+ * Capture a snapshot of the labor category list (contracted LCATs), same pattern as staff rosters.
+ * @param db Database connection
+ * @param callOrderId Call order ID
+ * @param userId User making the change
+ * @param changeType Type of change: add, update, delete
+ * @param changedLcatId ID of labor category that changed
+ * @param reason Optional reason for the change
+ * @returns Snapshot ID
+ */
+export async function captureLcatSnapshot(
+  db: Queryable,
+  callOrderId: string,
+  userId: number | null,
+  changeType: 'add' | 'update' | 'delete' | null = null,
+  changedLcatId: number | null = null,
+  reason: string | null = null
+): Promise<number> {
+  const { rows } = await db.query(
+    `select id, name, fte, hours, rate, sort_order
+     from labor_categories
+     where call_order_id = $1
+     order by sort_order, id`,
+    [callOrderId]
+  );
+
+  const lcats = rows.map((l) => ({
+    id: l.id,
+    name: l.name,
+    fte: parseFloat(l.fte),
+    hours: l.hours,
+    rate: parseFloat(l.rate),
+    sortOrder: l.sort_order,
+  }));
+
+  const result = await db.query(
+    `insert into labor_category_snapshots
+     (call_order_id, labor_categories, created_by_user_id, change_reason, change_type, changed_lcat_id)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id`,
+    [callOrderId, JSON.stringify(lcats), userId, reason, changeType, changedLcatId]
+  );
+
+  return result.rows[0].id;
+}
+
+/**
+ * Capture a snapshot of the contract document list (award/mod files), same pattern as staff rosters.
+ * @param db Database connection
+ * @param callOrderId Call order ID
+ * @param userId User making the change
+ * @param changeType Type of change: add, update, delete
+ * @param changedDocumentId ID of contract document that changed
+ * @param reason Optional reason for the change
+ * @returns Snapshot ID
+ */
+export async function captureContractDocumentSnapshot(
+  db: Queryable,
+  callOrderId: string,
+  userId: number | null,
+  changeType: 'add' | 'update' | 'delete' | null = null,
+  changedDocumentId: number | null = null,
+  reason: string | null = null
+): Promise<number> {
+  const { rows } = await db.query(
+    `select id, name, is_admin_mod, is_funding_mod, funding_change_amount, pop_period_label, effective_date, sort_order
+     from contract_documents
+     where call_order_id = $1
+     order by sort_order, id`,
+    [callOrderId]
+  );
+
+  const documents = rows.map((d) => ({
+    id: d.id,
+    name: d.name,
+    isAdminMod: d.is_admin_mod,
+    isFundingMod: d.is_funding_mod,
+    fundingChangeAmount: d.funding_change_amount !== null ? parseFloat(d.funding_change_amount) : null,
+    popPeriodLabel: d.pop_period_label,
+    effectiveDate: d.effective_date,
+    sortOrder: d.sort_order,
+  }));
+
+  const result = await db.query(
+    `insert into contract_document_snapshots
+     (call_order_id, contract_documents, created_by_user_id, change_reason, change_type, changed_document_id)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id`,
+    [callOrderId, JSON.stringify(documents), userId, reason, changeType, changedDocumentId]
+  );
+
+  return result.rows[0].id;
+}
+
+/**
  * Capture both call order and staff snapshots in a single transaction.
  * Use this when changes affect both financial and people data.
  * @param db Database connection

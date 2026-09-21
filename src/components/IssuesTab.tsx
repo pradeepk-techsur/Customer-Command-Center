@@ -41,7 +41,7 @@ export function IssuesTab({ callOrderId, issues, isPm, mutate }: { callOrderId: 
         </div>
       )}
       {sorted.map((i) => (
-        <div key={i.id} className="report-item" style={{ display: "block", opacity: i.status === "closed" ? 0.6 : 1 }}>
+        <div key={i.id} className="report-item" style={{ display: "block", padding: "9px 20px", opacity: i.status === "closed" ? 0.6 : 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div style={{ flex: 1 }}>{i.description}</div>
             <div style={{ color: "var(--ink-3)", whiteSpace: "nowrap" }}>{i.status}</div>

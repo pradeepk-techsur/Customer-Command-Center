@@ -19,6 +19,16 @@ export function parsePop(pop: string): { start: string | null; end: string | nul
   return { start: p(parts[0]), end: p(parts[1]) };
 }
 
+/** YYYY-MM-DD, YYYY-MM-DD → "9/26/25 – 9/25/26" (or "To be entered" if either is missing). */
+export function formatPop(start: string | null, end: string | null): string {
+  const fmt = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return `${m}/${d}/${String(y).slice(2)}`;
+  };
+  if (!start || !end) return "To be entered";
+  return `${fmt(start)} \u2013 ${fmt(end)}`;
+}
+
 /** "Sep 8, 2026" / "Jul 15, 2026" / "6/29/2026" → YYYY-MM-DD or null. */
 export function toIsoDate(label: string | null | undefined): string | null {
   if (!label) return null;

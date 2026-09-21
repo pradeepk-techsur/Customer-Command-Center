@@ -35,7 +35,7 @@ export default function App() {
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [page, setPage] = useState<Page>("orders");
   const [selected, setSelected] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("Financials");
+  const [tab, setTab] = useState<Tab>("General");
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [sorts, setSorts] = useState<Record<string, SortState>>({});
 
@@ -227,7 +227,7 @@ export default function App() {
         role={user.role} 
         userName={user.name}
         contract={snapshot?.contract || fallbackContract}
-        onPage={(p) => { setPage(p); if (p === "orders") setSelected(null); }} 
+        onPage={(p) => { setPage(p); if (p === "orders") { setSelected(null); setSelectedStaffId(null); } }} 
         onLogout={handleLogout}
       />
       {error && (
@@ -248,7 +248,7 @@ export default function App() {
           onBack={() => setSelected(null)} onTab={setTab} onSelectPeriod={setSelected} onSelectStaff={setSelectedStaffId} />
       ) : (
         <ContractDetailPage snapshot={snapshot}
-          onSelectCallOrder={(id) => { setSelected(id); setTab("Financials"); }} />
+          onSelectCallOrder={(id) => { setSelected(id); setTab("General"); }} />
       )}
       </SortContext.Provider>
       {showPasswordChange && user && (

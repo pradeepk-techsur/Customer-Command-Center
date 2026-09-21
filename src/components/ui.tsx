@@ -52,8 +52,8 @@ export function TextInput({ value, onChange, small, style, disabled, placeholder
   return <input type={type || "text"} className={"input num" + (small ? " small" : "")} value={value} onChange={(e) => onChange(e.target.value)} style={style} disabled={disabled} placeholder={placeholder} />;
 }
 
-export function TextArea({ value, onChange, rows, small, style }: { value: string; onChange: (v: string) => void; rows: number; small?: boolean; style?: React.CSSProperties }) {
-  return <textarea className={"textarea" + (small ? " small" : "")} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} style={style} />;
+export function TextArea({ value, onChange, rows, small, style, onBlur }: { value: string; onChange: (v: string) => void; rows: number; small?: boolean; style?: React.CSSProperties; onBlur?: () => void }) {
+  return <textarea className={"textarea" + (small ? " small" : "")} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} style={style} onBlur={onBlur} />; 
 }
 
 // Toast notification system

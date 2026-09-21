@@ -117,9 +117,16 @@ export const api = {
   snapshot: () => request("/api/portal"),
   uploadCallOrders: (list: FileList) => request("/api/call-orders/upload", { method: "POST", body: files(list) }),
   saveSpend: (id: string, spend: string) => request(`/api/call-orders/${enc(id)}/spend`, { method: "PATCH", body: json({ spend }) }),
+  saveDescription: (id: string, description: string) => request(`/api/call-orders/${enc(id)}/description`, { method: "PATCH", body: json({ description }) }),
+  saveCallOrderSetup: (id: string, input: { popStart?: string; popEnd?: string; funded?: string; eac?: string; overUnder?: string; pm?: string }) =>
+    request(`/api/call-orders/${enc(id)}/setup`, { method: "PATCH", body: json(input) }),
+  addCallOrderPeriod: (groupKey: string, input: { popStart: string; popEnd: string; funded?: string }) =>
+    request(`/api/call-orders/${enc(groupKey)}/periods`, { method: "POST", body: json(input) }),
   addStaff: (id: string, input: { name: string; laborCategory: string; rate: string }) =>
     request(`/api/call-orders/${enc(id)}/staff`, { method: "POST", body: json(input) }),
   setStaffStatus: (staffId: number, status: string) => request(`/api/staff/${staffId}`, { method: "PATCH", body: json({ status }) }),
+  updateStaff: (staffId: number, input: { name?: string; laborCategory?: string; rate?: string; status?: string }) =>
+    request(`/api/staff/${staffId}`, { method: "PATCH", body: json(input) }),
   removeStaff: (staffId: number) => request(`/api/staff/${staffId}`, { method: "DELETE" }),
 
   // CLINs
@@ -197,6 +204,11 @@ export const api = {
   removeStaffEquipment: (equipmentId: number) => request(`/api/staffing/equipment/${equipmentId}`, { method: "DELETE" }),
   setLcatVacancyStatus: (lcatId: number, vacancyStatus: string) =>
     request(`/api/staffing/labor-categories/${lcatId}/vacancy-status`, { method: "PATCH", body: json({ vacancyStatus }) }),
+  addLcat: (callOrderId: string, input: { name: string; fte: string; hours: string; rate: string }) =>
+    request(`/api/staffing/call-orders/${enc(callOrderId)}/labor-categories`, { method: "POST", body: json(input) }),
+  updateLcat: (lcatId: number, input: { name?: string; fte?: string; hours?: string; rate?: string }) =>
+    request(`/api/staffing/labor-categories/${lcatId}`, { method: "PATCH", body: json(input) }),
+  removeLcat: (lcatId: number) => request(`/api/staffing/labor-categories/${lcatId}`, { method: "DELETE" }),
   addStaffTransfer: (input: { staffId: number; toCallOrderId?: string; toLcat?: string; effectiveDate: string; notes?: string }) =>
     request(`/api/staffing/transfers`, { method: "POST", body: json(input) }),
   completeStaffTransfer: (transferId: number) => request(`/api/staffing/transfers/${transferId}/complete`, { method: "POST" }),

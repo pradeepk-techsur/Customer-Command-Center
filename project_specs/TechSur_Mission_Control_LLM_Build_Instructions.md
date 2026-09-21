@@ -41,7 +41,7 @@ When two requirements conflict, use this order:
 1. Tuesday weekly-brief readiness.
 2. Accuracy, traceability, and customer transparency.
 3. Enter information once and reuse it everywhere.
-4. Simple maintenance for Paul, Aiden, and Jessica.
+4. Simple maintenance for Paul, Aidan, and Jessica.
 5. Security and least-privilege access.
 6. Visual polish.
 7. Optional convenience features.
@@ -125,9 +125,9 @@ Paul can:
 
 Paul cannot directly alter or delete a locked report version. Corrections must create a new version while preserving the original.
 
-### 5.2 PM Support — Aiden and Jessica
+### 5.2 PM Support — Aidan and Jessica
 
-Aiden and Jessica maintain operational information continuously.
+Aidan and Jessica maintain operational information continuously.
 
 They can:
 
@@ -182,7 +182,7 @@ Use one consistent application shell. The navigation must contain:
 ### Role-based landing pages
 
 - CORs land directly on the current published Weekly Brief.
-- Paul, Aiden, and Jessica land on a Preparation Center showing records that need attention before the next meeting.
+- Paul, Aidan, and Jessica land on a Preparation Center showing records that need attention before the next meeting.
 
 The Preparation Center must be exception-driven. It should identify items such as:
 
@@ -614,7 +614,7 @@ Group the report by Call Order. For each Call Order, display:
 
 ### 17.3 Weekly narrative
 
-Weekly Activity Details is report-specific narrative maintained by Paul, Aiden, or Jessica.
+Weekly Activity Details is report-specific narrative maintained by Paul, Aidan, or Jessica.
 
 Support:
 
@@ -654,7 +654,7 @@ Workflow:
 
 ```text
 System creates or refreshes Draft
-  → Paul/Aiden/Jessica update narrative and source records
+  → Paul/Aidan/Jessica update narrative and source records
   → Report passes validation
   → Paul previews COR view
   → Paul locks report
@@ -852,7 +852,7 @@ Architecture rules:
 - Store timestamps consistently in UTC.
 - Add database constraints for required relationships and valid date ranges.
 - Keep sample or demo data separate from production data.
-- Do not hard-code Paul, Aiden, Jessica, Joan, or Dean-Anne into application logic; seed them as configurable users and roles.
+- Do not hard-code Paul, Aidan, Jessica, Joan, or Dean-Anne into application logic; seed them as configurable users and roles.
 
 ---
 
@@ -985,7 +985,7 @@ Before writing production code, present these questions for business approval. D
 1. Confirm that invoice aging begins on Invoice Date rather than submission, receipt, or due date.
 2. Confirm that the 15-minute magic-link lifetime is acceptable.
 3. Confirm the approved risk probability, impact, and severity matrix.
-4. Confirm whether Aiden and Jessica may manage approved users or whether only Paul/system administration may do so.
+4. Confirm whether Aidan and Jessica may manage approved users or whether only Paul/system administration may do so.
 5. Confirm that “Rate” shown to CORs is the contract billing rate.
 6. Confirm the authoritative source for monthly actual spend and invoice payment status: manual entry, file import, or integration.
 7. Confirm whether uploaded files are stored in the application, SharePoint, or both.

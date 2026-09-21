@@ -12,7 +12,7 @@ interface ApprovedUser {
 
 const emptyForm = { email: "", name: "", role: "customer" as ApprovedUser["role"] };
 
-/** Manages the magic-link sign-in allowlist. Paul, Aiden, and Jessica can all use this (spec decision #4). */
+/** Manages the magic-link sign-in allowlist. Paul, Aidan, and Jessica can all use this (spec decision #4). */
 export function ApprovedUsersPanel() {
   const [approvedUsers, setApprovedUsers] = useState<ApprovedUser[]>([]);
   const [loading, setLoading] = useState(true);

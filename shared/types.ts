@@ -27,6 +27,7 @@ export interface StaffMember {
   laptopReceivedDate: string | null;
   pivIssuedDate: string | null;
   propertyReturnDocHref: string | null;
+  equipmentReturnedDate: string | null;
   equipment: StaffEquipment[];
 }
 
@@ -79,6 +80,7 @@ export interface CallOrder {
   groupKey: string;
   groupName: string;
   name: string;
+  description: string;
   pop: string;
   popStart: string | null;
   popEnd: string | null;
@@ -368,8 +370,10 @@ export interface MsrSectionInput {
   travel: string;
 }
 
+// "PIV pending" was removed: PIV issuance is tracked as its own onboarding-stage date (pivIssuedDate)
+// on StaffDetailPage, not a status — a person can be Assigned/Onboarding AND still awaiting a PIV.
 export const STATUS_OPTIONS = [
-  "Assigned", "Vacant", "On leave", "PIV pending", "Onboarding", "Recruiting", "Offboarded", "No longer available",
+  "Assigned", "Vacant", "On leave", "Onboarding", "Recruiting", "Offboarded", "No longer available",
 ];
 
 // ============================================================================
@@ -411,6 +415,32 @@ export interface StaffSnapshot {
   changeReason: string | null;
   changeType: 'add' | 'update' | 'delete' | null;
   changedStaffId: number | null;
+  createdAt: string;  // ISO timestamp
+}
+
+export interface LcatSnapshot {
+  id: number;
+  callOrderId: string;
+  snapshotTime: string;  // ISO timestamp
+  laborCategories: LaborCategory[];
+  createdByUserId: number | null;
+  createdByUserName?: string;  // Joined from users table
+  changeReason: string | null;
+  changeType: 'add' | 'update' | 'delete' | null;
+  changedLcatId: number | null;
+  createdAt: string;  // ISO timestamp
+}
+
+export interface ContractDocumentSnapshot {
+  id: number;
+  callOrderId: string;
+  snapshotTime: string;  // ISO timestamp
+  contractDocuments: ContractDocument[];
+  createdByUserId: number | null;
+  createdByUserName?: string;  // Joined from users table
+  changeReason: string | null;
+  changeType: 'add' | 'update' | 'delete' | null;
+  changedDocumentId: number | null;
   createdAt: string;  // ISO timestamp
 }
 

@@ -14,6 +14,7 @@ export interface SeedCallOrder {
   group: string;
   groupName: string;
   name: string;
+  description: string;
   pop: string;
   funded: number;
   spend: number;
@@ -65,7 +66,9 @@ export interface SeedMonthlyReport {
 
 export const DATA: SeedCallOrder[] = [
   {
-    id: "Call 2.3", group: "Call 002", groupName: "Enterprise Architecture (EA) Support", name: "Enterprise Architecture (EA) Support", pop: "9/26/25 – 9/25/26",
+    id: "Call 2.3", group: "Call 002", groupName: "Enterprise Architecture (EA) Support", name: "Enterprise Architecture (EA) Support",
+    description: "Enterprise architecture governance, technical reference model management, and IT standards development supporting the AOUSC's application and infrastructure landscape.",
+    pop: "9/26/25 – 9/25/26",
     funded: 3225811.68, spend: 2575020.37, remaining: 650791.31, eac: 3146252.37, over: 79559.31,
     pm: "Ceenil Kaur",
     lcats: [["Business Analyst – Senior",2,1912,122.45],["Enterprise Architect",3,1912,115.47],["Systems Integration Engineer",3,1912,154.94],["Project Manager – Mid",1,1912,81.63],["Communications Specialist – Senior",1,1912,75.92],["Cloud Architect – CDaaS/PaaS/Cloud Hosting",1,1912,155.10],["Systems Architect",2,1912,110.20],["Data Architect",1,1912,97.96],["Systems Integration Engineer",5,478,154.94],["Business Analyst – Senior",1,478,122.45],["Business Analyst – Mid",1,478,97.96]],
@@ -73,7 +76,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Business Architect: moving Alisa Welch into the role from EA Standards; Nada Conway planned as backfill (started 8/27).","Business Analyst: Chetna Walia started 8/24.","Data Architect: final selection down to one candidate; Nat Iyer is no longer available.","Discrepancy: 3 Systems Integration Engineers are contracted, 5 are currently assigned.","This call order period ends 9/25/26."]
   },
   {
-    id: "Call 4.3", group: "Call 004", groupName: "Multifactor Authentication (MFA) Support", name: "Multifactor Authentication (MFA) Support", pop: "4/10/26 – 4/9/27",
+    id: "Call 4.3", group: "Call 004", groupName: "Multifactor Authentication (MFA) Support", name: "Multifactor Authentication (MFA) Support",
+    description: "Multifactor authentication engineering and operational support, including Login.gov integration, Windows Hello for Business, and adaptive authentication capabilities.",
+    pop: "4/10/26 – 4/9/27",
     funded: 1941638.40, spend: 520681.92, remaining: 1420956.48, eac: 1457738.96, over: 483899.44,
     pm: "Lauryn Brown",
     lcats: [["Systems Integration Engineer",6,1920,154.94],["Project Manager",1,1920,81.63]],
@@ -81,7 +86,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Lauryn Brown has been on maternity leave since 8/11; anticipated return 9/8 after an additional week.","One Systems Integration Engineer position is vacant and on hold."]
   },
   {
-    id: "Call 13.1", group: "Call 013", groupName: "DevSecOps Support", name: "DevSecOps Support", pop: "9/13/25 – 9/12/26",
+    id: "Call 13.1", group: "Call 013", groupName: "DevSecOps Support", name: "DevSecOps Support",
+    description: "DevSecOps engineering support for CI/CD pipeline management, secure software delivery practices, and platform automation.",
+    pop: "9/13/25 – 9/12/26",
     funded: 1491977.28, spend: 1242382.55, remaining: 249594.73, eac: 1463896.15, over: 28081.13,
     pm: "—",
     lcats: [["Systems Integration Engineer",4,1920,154.94],["Business Analyst – Senior",1,1920,122.45]],
@@ -89,7 +96,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["No status items reported for the current touchpoint."]
   },
   {
-    id: "Call 13.2", group: "Call 013", groupName: "DevSecOps Support", name: "DevSecOps Support", pop: "9/13/26 – 9/12/27",
+    id: "Call 13.2", group: "Call 013", groupName: "DevSecOps Support", name: "DevSecOps Support",
+    description: "DevSecOps engineering support for CI/CD pipeline management, secure software delivery practices, and platform automation.",
+    pop: "9/13/26 – 9/12/27",
     funded: 1756992.00, spend: 0, remaining: 1756992.00, eac: null, over: null,
     pm: "—",
     lcats: [["Systems Integration Engineer",4,1920,154.94],["Business Analyst – Senior",1,1920,122.45]],
@@ -97,7 +106,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Option period funded; performance begins 9/13/26."]
   },
   {
-    id: "Call 15.1", group: "Call 015", groupName: "Innovation & Research (I&R)", name: "Innovation & Research (I&R)", pop: "9/25/25 – 9/24/26",
+    id: "Call 15.1", group: "Call 015", groupName: "Innovation & Research (I&R)", name: "Innovation & Research (I&R)",
+    description: "Innovation and research initiatives evaluating emerging technologies and piloting new capabilities for the AOUSC.",
+    pop: "9/25/25 – 9/24/26",
     funded: 1853995.87, spend: 1069330.24, remaining: 784665.63, eac: 1310034.40, over: 543961.47,
     pm: "—",
     lcats: [["Business Analyst – Senior",1,1912,122.45],["Software Engineer",1,1912,141.14],["Artificial Intelligence (AI) Engineer",2,1912,122.45],["Enterprise Architect",1,1912,115.47],["Systems Integration Engineer",1,1912,154.94],["Information Assurance Engineer",1,1912,85.71]],
@@ -105,7 +116,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Expansion positions beginning 9/25 at the start of the new option period: two Agile Coach/Consultant – Senior and one Business Systems Analyst – Mid.","Shawn Faunce and Megan Giesy move over from the ZTA call order for the Agile Coach/Consultant roles.","Mary Raguso moves over from ZTA for the Business Systems Analyst – Mid position."]
   },
   {
-    id: "Call 16.1", group: "Call 016", groupName: "Reliability & Availability Engineering (RAE)", name: "Reliability & Availability Engineering (RAE)", pop: "2/26/26 – 2/25/27",
+    id: "Call 16.1", group: "Call 016", groupName: "Reliability & Availability Engineering (RAE)", name: "Reliability & Availability Engineering (RAE)",
+    description: "Reliability and availability engineering support for monitoring, incident management, and system resilience across judiciary IT platforms.",
+    pop: "2/26/26 – 2/25/27",
     funded: 3383404.80, spend: 1270961.22, remaining: 2112443.58, eac: 3139912.02, over: 243492.78,
     pm: "Andrew Camp",
     lcats: [["Agile Coach",4,1920,143.11],["Communications Specialist",1,1920,75.92],["Cyber Threat Analyst",2,1920,96.18],["Enterprise Architect",2,1920,115.47],["Information Systems Engineer",2,1920,122.45],["Project Manager",1,1920,81.63],["Systems Engineer",3,1920,111.43]],
@@ -113,7 +126,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Dora Mensah, Cyber Threat Analyst, offboarded 8/28; PIV card and laptop retrieved and returned to the AO.","Reza begins work once his laptop arrives; targeting 9/8.","Outreach to Chuck Diard for Courtroom Technology support; he is interested in a full-time opportunity."]
   },
   {
-    id: "Call 17", group: "Call 017", groupName: "Enterprise IT Program Management (EITPM)", name: "Enterprise IT Program Management (EITPM)", pop: "9/1/25 – 8/31/26",
+    id: "Call 17", group: "Call 017", groupName: "Enterprise IT Program Management (EITPM)", name: "Enterprise IT Program Management (EITPM)",
+    description: "Enterprise IT program management support, including Agile coaching, PMO governance, and program-level delivery oversight.",
+    pop: "9/1/25 – 8/31/26",
     funded: 1681420.80, spend: 1452328.66, remaining: 229092.14, eac: 1615344.66, over: 66076.14,
     pm: "Taiwo Adenuga",
     lcats: [["Project Manager",1,1920,81.63],["Agile Coach / Consultant",5,1920,143.11],["Agile Certified Professional",1,1920,78.56]],
@@ -121,7 +136,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["No status items reported for the current touchpoint."]
   },
   {
-    id: "Call 17.1", group: "Call 017", groupName: "Enterprise IT Program Management (EITPM)", name: "Enterprise IT Program Management (EITPM)", pop: "9/1/26 – 8/31/27",
+    id: "Call 17.1", group: "Call 017", groupName: "Enterprise IT Program Management (EITPM)", name: "Enterprise IT Program Management (EITPM)",
+    description: "Enterprise IT program management support, including Agile coaching, PMO governance, and program-level delivery oversight.",
+    pop: "9/1/26 – 8/31/27",
     funded: 1940185.51, spend: 0, remaining: 1940185.51, eac: null, over: null,
     pm: "Taiwo Adenuga",
     lcats: [["Project Manager",1,1920,81.63],["Agile Coach / Consultant",5,1920,143.11],["Agile Certified Professional",1,1920,78.56]],
@@ -129,7 +146,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Option period funded; performance begins 9/1/26."]
   },
   {
-    id: "Call 18", group: "Call 018", groupName: "Zero Trust Architecture (ZTA)", name: "Zero Trust Architecture (ZTA)", pop: "9/15/25 – 9/14/26",
+    id: "Call 18", group: "Call 018", groupName: "Zero Trust Architecture (ZTA)", name: "Zero Trust Architecture (ZTA)",
+    description: "Zero Trust Architecture implementation support, including identity, network segmentation, and access control modernization.",
+    pop: "9/15/25 – 9/14/26",
     funded: 2000000.00, spend: 1469174.48, remaining: 530825.52, eac: 1750020.08, over: 249979.92,
     pm: "—",
     lcats: [["Agile Coach / Consultant",2,1920,143.11],["Cloud Architect",3,1920,155.10],["Systems Integration Engineer",1,1920,154.94],["Data Scientist",1,1920,141.44],["Information Systems Engineer",1,1920,122.45]],
@@ -137,7 +156,9 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Training videos return to the airport model: four planned videos, three under two minutes and one around three to four minutes.","All storyboards are complete and reviewed by Cheryl and Kevin.","This call order period ends 9/14/26."]
   },
   {
-    id: "Call 19", group: "Call 019", groupName: "Technology Business Management (TBM) Study", name: "Technology Business Management (TBM) Study", pop: "9/2/26 – 4/1/27",
+    id: "Call 19", group: "Call 019", groupName: "Technology Business Management (TBM) Study", name: "Technology Business Management (TBM) Study",
+    description: "Technology Business Management study to assess IT cost transparency and value reporting practices.",
+    pop: "9/2/26 – 4/1/27",
     funded: 288249.56, spend: 0, remaining: 288249.56, eac: null, over: null,
     pm: "—", lcats: [], staff: [],
     highlights: ["New call order awarded 8/28.","To be included in the monthly status report alongside the other call orders."]

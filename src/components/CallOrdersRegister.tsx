@@ -77,7 +77,7 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, 
             : g.periods.length > 1 ? `${g.key} · ${callNum} · ${g.periods.length} periods` : `${g.key} · ${callNum}`;
           const burning = c.funded > 0 && c.spend > 0;
           return (
-            <div key={g.key} className="grid trow clickable register-cols" onClick={() => onOpen(c.id, "Financials")}>
+            <div key={g.key} className="grid trow clickable register-cols" onClick={() => onOpen(c.id, "General")}>
               <div>
                 <div className="register-name">{g.name}</div>
                 <div className="register-id">{idLine}</div>

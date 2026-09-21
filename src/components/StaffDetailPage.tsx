@@ -11,7 +11,41 @@ const ONBOARDING_STAGES: { key: keyof StaffMember; label: string }[] = [
   { key: "fingerprintsCompleteDate", label: "Fingerprints Complete" },
   { key: "laptopReceivedDate", label: "Laptop Received" },
   { key: "startDate", label: "Start Date" },
+  { key: "pivIssuedDate", label: "PIV Issued" },
 ];
+
+/**
+ * A date value with an explicit Edit/Save/Cancel flow (rather than saving on every onChange).
+ * Native date inputs fire onChange with an incomplete-looking date while the user is still
+ * picking a month/day, so auto-saving on change could silently record the wrong date — this
+ * requires a deliberate Save click instead.
+ */
+function EditableDate({ label, value, isPm, onSave }: { label: string; value: string | null; isPm: boolean; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  if (!isPm) return <div className="fin-row"><div style={{ color: "var(--ink-3)" }}>{label}</div><div className="v">{dateLabel(value)}</div></div>;
+  if (!editing) {
+    return (
+      <div className="fin-row">
+        <div style={{ color: "var(--ink-3)" }}>{label}</div>
+        <div className="v" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {dateLabel(value)}
+          <button type="button" className="link-text" onClick={() => { setDraft(value ?? ""); setEditing(true); }}>Edit</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="fin-row">
+      <div style={{ color: "var(--ink-3)" }}>{label}</div>
+      <div className="v" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="date" className="input" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <Button primary onClick={() => { onSave(draft); setEditing(false); }}>Save</Button>
+        <Button onClick={() => setEditing(false)}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
 
 export function StaffDetailPage({ staff: s, isPm, mutate, onBack }: { staff: StaffMember; isPm: boolean; mutate: Mutate; onBack: () => void }) {
   const [contact, setContact] = useState({ aoEmail: s.aoEmail || "", phone: s.phone || "" });
@@ -44,14 +78,7 @@ export function StaffDetailPage({ staff: s, isPm, mutate, onBack }: { staff: Sta
             <Field label="AO email"><TextInput value={contact.aoEmail} onChange={(v) => setContact({ ...contact, aoEmail: v })} disabled={!isPm} /></Field>
             <Field label="Phone"><TextInput value={contact.phone} onChange={(v) => setContact({ ...contact, phone: v })} disabled={!isPm} /></Field>
             {isPm && <Button primary onClick={saveContact}>Save contact info</Button>}
-            <div className="fin-row"><div style={{ color: "var(--ink-3)" }}>Start date</div><div className="v">{dateLabel(s.startDate)}</div></div>
-            {departed && <div className="fin-row"><div style={{ color: "var(--ink-3)" }}>End date</div><div className="v">{dateLabel(s.endDate)}</div></div>}
-            <div className="fin-row"><div style={{ color: "var(--ink-3)" }}>PIV issued</div><div className="v">{dateLabel(s.pivIssuedDate)}</div></div>
-            {isPm && !s.pivIssuedDate && (
-              <Field label="Record PIV issuance date">
-                <input type="date" className="input" onChange={(e) => setStageDate("pivIssuedDate", e.target.value)} />
-              </Field>
-            )}
+            <EditableDate label="Start date" value={s.startDate} isPm={isPm} onSave={(v) => setStageDate("startDate", v)} />
           </div>
         </div>
 
@@ -76,30 +103,29 @@ export function StaffDetailPage({ staff: s, isPm, mutate, onBack }: { staff: Sta
 
       <div className="card" style={{ marginTop: 18 }}>
         <div className="card-head">Onboarding stages</div>
-        <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-          {ONBOARDING_STAGES.map((stage) => {
-            const value = s[stage.key] as string | null;
-            return (
-              <div key={String(stage.key)} className="fin-row">
-                <div style={{ color: "var(--ink-3)" }}>{stage.label}</div>
-                {value ? <div className="v">{dateLabel(value)}</div>
-                  : isPm ? <input type="date" className="input" onChange={(e) => setStageDate(stage.key, e.target.value)} />
-                  : <div className="v">—</div>}
-              </div>
-            );
-          })}
+        <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+          {ONBOARDING_STAGES.map((stage) => (
+            <EditableDate key={String(stage.key)} label={stage.label} value={s[stage.key] as string | null} isPm={isPm} onSave={(v) => setStageDate(stage.key, v)} />
+          ))}
         </div>
       </div>
 
-      {departed && (
+      {(isPm || departed) && (
         <div className="card" style={{ marginTop: 18 }}>
-          <div className="card-head">Property return</div>
-          <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-            {s.propertyReturnDocHref
-              ? <a href={s.propertyReturnDocHref} target="_blank" rel="noreferrer">Open property return document</a>
-              : <div className="card-empty">No property return document uploaded.</div>}
+          <div className="card-head">Offboarding</div>
+          <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+            <EditableDate label="End date" value={s.endDate} isPm={isPm} onSave={(v) => setStageDate("endDate", v)} />
+            <EditableDate label="Date equipment returned" value={s.equipmentReturnedDate} isPm={isPm} onSave={(v) => setStageDate("equipmentReturnedDate", v)} />
+            <div className="fin-row">
+              <div style={{ color: "var(--ink-3)" }}>Property return document</div>
+              <div className="v">
+                {s.propertyReturnDocHref
+                  ? <a href={s.propertyReturnDocHref} target="_blank" rel="noreferrer">Open document</a>
+                  : "—"}
+              </div>
+            </div>
             {isPm && (
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <input type="file" ref={propertyReturnRef} />
                 <Button onClick={uploadPropertyReturn}>Upload</Button>
               </div>

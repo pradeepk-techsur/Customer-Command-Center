@@ -40,7 +40,7 @@ export async function seed() {
       { email: "alex.johnson@techsur.com", name: "Alex Johnson", role: "pm" },
       { email: "maria.garcia@techsur.com", name: "Maria Garcia", role: "pm" },
       // PM support: full BPA-wide access (assigned to every call order below)
-      { email: "aiden.park@techsur.com", name: "Aiden Park", role: "pm" },
+      { email: "aidan.park@techsur.com", name: "Aidan Park", role: "pm" },
       { email: "jessica.delasalle@techsur.com", name: "Jessica de la Salle", role: "pm" },
       // CORs: full BPA-wide read access (assigned to every call order below)
       { email: "joan.nairn@aousc.gov", name: "Joan Nairn", role: "customer" },
@@ -61,9 +61,9 @@ export async function seed() {
     for (const [i, c] of DATA.entries()) {
       const { start, end } = parsePop(c.pop);
       await db.query(
-        `insert into call_orders (id, group_key, group_name, name, pop_label, pop_start, pop_end, funded, spend, eac, over_under, pm, pending, highlights, fin_updated_on, people_updated_on, sort_order)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,$13,$14,$15,$16)`,
-        [c.id, c.group, c.groupName, c.name, c.pop, start, end, c.funded, c.spend, c.eac, c.over, c.pm,
+        `insert into call_orders (id, group_key, group_name, name, description, pop_label, pop_start, pop_end, funded, spend, eac, over_under, pm, pending, highlights, fin_updated_on, people_updated_on, sort_order)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14,$15,$16,$17)`,
+        [c.id, c.group, c.groupName, c.name, c.description, c.pop, start, end, c.funded, c.spend, c.eac, c.over, c.pm,
          JSON.stringify(c.highlights), DEFAULT_STAMPS.fin, DEFAULT_STAMPS.people, i],
       );
       for (const [j, l] of c.lcats.entries()) {
@@ -178,11 +178,11 @@ export async function seed() {
       }
     }
 
-    // BPA-wide PM support (Aiden/Jessica) and CORs (Joan/Dean-Anne) see/edit every call order.
+    // BPA-wide PM support (Aidan/Jessica) and CORs (Joan/Dean-Anne) see/edit every call order.
     await db.query(
       `insert into user_call_orders (user_id, call_order_id)
        select u.id, c.id from users u cross join call_orders c
-       where u.email in ('aiden.park@techsur.com','jessica.delasalle@techsur.com','joan.nairn@aousc.gov','dean-anne.campbell@aousc.gov')
+       where u.email in ('aidan.park@techsur.com','jessica.delasalle@techsur.com','joan.nairn@aousc.gov','dean-anne.campbell@aousc.gov')
          and not c.pending
        on conflict do nothing`
     );

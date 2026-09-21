@@ -19,7 +19,7 @@ interface User {
 type AdminTab = "users" | "audit" | "approved";
 
 export function AdminPage({ role }: { role: Role }) {
-  // pm (Aiden/Jessica) only has access to the Approved Sign-in List within this page.
+  // pm (Aidan/Jessica) only has access to the Approved Sign-in List within this page.
   const pmOnly = role === "pm";
   const [activeTab, setActiveTab] = useState<AdminTab>(pmOnly ? "approved" : "users");
   const [users, setUsers] = useState<User[]>([]);
@@ -223,7 +223,7 @@ export function AdminPage({ role }: { role: Role }) {
     return <AuditLogPage />;
   }
 
-  // Approved sign-in list: Paul, Aiden, and Jessica (pm/program_manager/admin) can all manage it.
+  // Approved sign-in list: Paul, Aidan, and Jessica (pm/program_manager/admin) can all manage it.
   if (activeTab === "approved") {
     return (
       <div className="page">
@@ -295,7 +295,7 @@ export function AdminPage({ role }: { role: Role }) {
               cursor: "pointer",
             }}
           >
-            + {isProgramManager ? "Invite Customer" : "Add User"}
+            + Add User
           </button>
         </div>
       </div>

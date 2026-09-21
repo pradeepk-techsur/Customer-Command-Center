@@ -1,12 +1,14 @@
 import type { PortalSnapshot } from "../../shared/types.ts";
 import { filled, usdFull } from "../lib/format.ts";
 import { Eyebrow } from "./ui.tsx";
+import { groupCallOrders } from "./CallOrdersRegister.tsx";
 
 export function ContractDetailPage({ snapshot, onSelectCallOrder }: {
   snapshot: PortalSnapshot; onSelectCallOrder: (id: string) => void;
 }) {
-  const { contract } = snapshot;
-  const callOrders = snapshot.callOrders.filter((c) => !c.pending);
+  const { contract, today } = snapshot;
+  // One row per call order family (option periods live as tabs on the detail page, not separate rows here).
+  const groups = groupCallOrders(snapshot.callOrders.filter((c) => !c.pending), today);
 
   return (
     <div className="page detail">
@@ -28,13 +30,16 @@ export function ContractDetailPage({ snapshot, onSelectCallOrder }: {
           <div className="card-head wide">
             <div>Call orders</div>
           </div>
-          {callOrders.map((c) => (
-            <button key={c.id} type="button" className="fin-row" style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: 0, borderBottom: "1px solid var(--line-soft)" }} onClick={() => onSelectCallOrder(c.id)}>
-              <div style={{ color: "var(--ink-2)" }}>{c.name}<div style={{ color: "var(--ink-3)", fontSize: 11 }}>{filled(c)} people · {usdFull(c.funded)} funded</div></div>
-              <div className="v num">{usdFull(c.spend)}</div>
-            </button>
-          ))}
-          {!callOrders.length && <div className="card-empty">No call orders yet.</div>}
+          {groups.map((g) => {
+            const c = g.current;
+            return (
+              <button key={g.key} type="button" className="fin-row" style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: 0, borderBottom: "1px solid var(--line-soft)" }} onClick={() => onSelectCallOrder(c.id)}>
+                <div style={{ color: "var(--ink-2)" }}>{g.name}<div style={{ color: "var(--ink-3)", fontSize: 11 }}>{filled(c)} people · {usdFull(c.funded)} funded</div></div>
+                <div className="v num">{usdFull(c.spend)}</div>
+              </button>
+            );
+          })}
+          {!groups.length && <div className="card-empty">No call orders yet.</div>}
         </div>
       </div>
     </div>

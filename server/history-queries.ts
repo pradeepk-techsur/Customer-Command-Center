@@ -1,5 +1,5 @@
 import type { Queryable } from "./db.ts";
-import type { CallOrderSnapshot, StaffSnapshot, AuditLogEntry } from "../shared/types.ts";
+import type { CallOrderSnapshot, StaffSnapshot, LcatSnapshot, ContractDocumentSnapshot, AuditLogEntry } from "../shared/types.ts";
 
 /**
  * History query service for retrieving audit snapshots and building timelines.
@@ -127,6 +127,124 @@ export async function getStaffHistory(
     changeReason: r.change_reason,
     changeType: r.change_type,
     changedStaffId: r.changed_staff_id,
+    createdAt: r.created_at.toISOString(),
+  }));
+}
+
+/**
+ * Get labor category snapshots for a call order (same shape/pattern as staff history).
+ * @param db Database connection
+ * @param callOrderId Call order ID
+ * @param startDate Optional start date filter
+ * @param endDate Optional end date filter
+ * @param includeUserInfo Include user names (false for customers)
+ * @returns Array of labor category snapshots
+ */
+export async function getLcatHistory(
+  db: Queryable,
+  callOrderId: string,
+  startDate?: string,
+  endDate?: string,
+  includeUserInfo: boolean = true
+): Promise<LcatSnapshot[]> {
+  let query = `
+    select
+      s.id, s.call_order_id, s.snapshot_time, s.labor_categories,
+      s.created_by_user_id, s.change_reason, s.change_type, s.changed_lcat_id, s.created_at
+      ${includeUserInfo ? ', u.name as created_by_user_name' : ''}
+    from labor_category_snapshots s
+    ${includeUserInfo ? 'left join users u on s.created_by_user_id = u.id' : ''}
+    where s.call_order_id = $1
+  `;
+
+  const params: any[] = [callOrderId];
+  let paramIndex = 2;
+
+  if (startDate) {
+    query += ` and s.snapshot_time >= $${paramIndex}`;
+    params.push(startDate);
+    paramIndex++;
+  }
+
+  if (endDate) {
+    query += ` and s.snapshot_time <= $${paramIndex}`;
+    params.push(endDate);
+    paramIndex++;
+  }
+
+  query += ` order by s.snapshot_time desc`;
+
+  const { rows } = await db.query(query, params);
+
+  return rows.map((r) => ({
+    id: r.id,
+    callOrderId: r.call_order_id,
+    snapshotTime: r.snapshot_time.toISOString(),
+    laborCategories: r.labor_categories,
+    createdByUserId: r.created_by_user_id,
+    createdByUserName: includeUserInfo ? r.created_by_user_name : undefined,
+    changeReason: r.change_reason,
+    changeType: r.change_type,
+    changedLcatId: r.changed_lcat_id,
+    createdAt: r.created_at.toISOString(),
+  }));
+}
+
+/**
+ * Get contract document snapshots for a call order (same shape/pattern as labor category history).
+ * @param db Database connection
+ * @param callOrderId Call order ID
+ * @param startDate Optional start date filter
+ * @param endDate Optional end date filter
+ * @param includeUserInfo Include user names (false for customers)
+ * @returns Array of contract document snapshots
+ */
+export async function getContractDocumentHistory(
+  db: Queryable,
+  callOrderId: string,
+  startDate?: string,
+  endDate?: string,
+  includeUserInfo: boolean = true
+): Promise<ContractDocumentSnapshot[]> {
+  let query = `
+    select
+      s.id, s.call_order_id, s.snapshot_time, s.contract_documents,
+      s.created_by_user_id, s.change_reason, s.change_type, s.changed_document_id, s.created_at
+      ${includeUserInfo ? ', u.name as created_by_user_name' : ''}
+    from contract_document_snapshots s
+    ${includeUserInfo ? 'left join users u on s.created_by_user_id = u.id' : ''}
+    where s.call_order_id = $1
+  `;
+
+  const params: any[] = [callOrderId];
+  let paramIndex = 2;
+
+  if (startDate) {
+    query += ` and s.snapshot_time >= $${paramIndex}`;
+    params.push(startDate);
+    paramIndex++;
+  }
+
+  if (endDate) {
+    query += ` and s.snapshot_time <= $${paramIndex}`;
+    params.push(endDate);
+    paramIndex++;
+  }
+
+  query += ` order by s.snapshot_time desc`;
+
+  const { rows } = await db.query(query, params);
+
+  return rows.map((r) => ({
+    id: r.id,
+    callOrderId: r.call_order_id,
+    snapshotTime: r.snapshot_time.toISOString(),
+    contractDocuments: r.contract_documents,
+    createdByUserId: r.created_by_user_id,
+    createdByUserName: includeUserInfo ? r.created_by_user_name : undefined,
+    changeReason: r.change_reason,
+    changeType: r.change_type,
+    changedDocumentId: r.changed_document_id,
     createdAt: r.created_at.toISOString(),
   }));
 }

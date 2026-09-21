@@ -258,7 +258,7 @@ export async function buildSnapshot(
       });
     }
     return {
-      id: c.id, groupKey: c.group_key, groupName: c.group_name, name: c.name, pop: c.pop_label,
+      id: c.id, groupKey: c.group_key, groupName: c.group_name, name: c.name, description: c.description || "", pop: c.pop_label,
       popStart: c.pop_start, popEnd: c.pop_end, funded: c.funded, spend: c.spend, eac: c.eac, over: c.over_under,
       pm: c.pm, pending: c.pending, highlights: c.highlights, finUpdatedOn: c.fin_updated_on, peopleUpdatedOn: c.people_updated_on,
       laborCategories: lcats.rows.filter((l) => l.call_order_id === c.id).map((l) => ({
@@ -270,6 +270,7 @@ export async function buildSnapshot(
         offerAcceptedDate: s.offer_accepted_date || null, of306SubmittedDate: s.of306_submitted_date || null,
         fingerprintsCompleteDate: s.fingerprints_complete_date || null, laptopReceivedDate: s.laptop_received_date || null,
         pivIssuedDate: s.piv_issued_date || null, propertyReturnDocHref: s.property_return_doc_href || null,
+        equipmentReturnedDate: s.equipment_returned_date || null,
         equipment: equipment.rows.filter((e) => e.staff_id === s.id).map((e): StaffEquipment => ({
           id: e.id, staffId: e.staff_id, makeModel: e.make_model, propertyTagNumber: e.property_tag_number || null,
         })),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CallOrderSnapshot, StaffSnapshot, Role } from "../../shared/types.ts";
+import type { CallOrderSnapshot, StaffSnapshot, LcatSnapshot, ContractDocumentSnapshot, Role } from "../../shared/types.ts";
 import { getAccessToken } from "../api.ts";
 import { Button, Eyebrow, Field, TextInput } from "./ui.tsx";
 import { dateLabel, usd } from "../lib/format.ts";
@@ -8,11 +8,11 @@ interface HistoryEntry {
   id: string;
   date: string;
   time: string;
-  type: 'financial' | 'staff';
+  type: 'financial' | 'staff' | 'lcat' | 'contractdoc';
   description: string;
   changedBy?: string;
   details: any;
-  snapshot: CallOrderSnapshot | StaffSnapshot;
+  snapshot: CallOrderSnapshot | StaffSnapshot | LcatSnapshot | ContractDocumentSnapshot;
 }
 
 export function CallOrderHistory({ 
@@ -24,9 +24,11 @@ export function CallOrderHistory({
 }) {
   const [coHistory, setCoHistory] = useState<CallOrderSnapshot[]>([]);
   const [staffHistory, setStaffHistory] = useState<StaffSnapshot[]>([]);
+  const [lcatHistory, setLcatHistory] = useState<LcatSnapshot[]>([]);
+  const [contractDocHistory, setContractDocHistory] = useState<ContractDocumentSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'financial' | 'staff'>('all');
+  const [filter, setFilter] = useState<'all' | 'financial' | 'staff' | 'lcat' | 'contractdoc'>('all');
   const [compareMode, setCompareMode] = useState(false);
   const [date1, setDate1] = useState("");
   const [date2, setDate2] = useState("");
@@ -56,6 +58,8 @@ export function CallOrderHistory({
       const data = await response.json();
       setCoHistory(data.callOrderHistory || []);
       setStaffHistory(data.staffHistory || []);
+      setLcatHistory(data.lcatHistory || []);
+      setContractDocHistory(data.contractDocumentHistory || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -143,6 +147,66 @@ export function CallOrderHistory({
     });
   }
 
+  if (filter === 'all' || filter === 'lcat') {
+    lcatHistory.forEach((snapshot) => {
+      const date = new Date(snapshot.snapshotTime);
+      let description = '📊 Labor category updated';
+
+      if (snapshot.changeType === 'add') {
+        description = `📊 Labor category added`;
+      } else if (snapshot.changeType === 'update') {
+        description = `📊 Labor category updated`;
+      } else if (snapshot.changeType === 'delete') {
+        description = `📊 Labor category removed`;
+      }
+
+      allEntries.push({
+        id: `lcat-${snapshot.id}`,
+        date: date.toISOString().split('T')[0],
+        time: snapshot.snapshotTime,
+        type: 'lcat',
+        description,
+        changedBy: showUserInfo ? snapshot.createdByUserName : undefined,
+        details: {
+          lcatCount: snapshot.laborCategories.length,
+          changeType: snapshot.changeType,
+          reason: snapshot.changeReason,
+        },
+        snapshot,
+      });
+    });
+  }
+
+  if (filter === 'all' || filter === 'contractdoc') {
+    contractDocHistory.forEach((snapshot) => {
+      const date = new Date(snapshot.snapshotTime);
+      let description = '📄 Contract document updated';
+
+      if (snapshot.changeType === 'add') {
+        description = `📄 Contract document uploaded`;
+      } else if (snapshot.changeType === 'update') {
+        description = `📄 Contract document updated`;
+      } else if (snapshot.changeType === 'delete') {
+        description = `📄 Contract document removed`;
+      }
+
+      allEntries.push({
+        id: `contractdoc-${snapshot.id}`,
+        date: date.toISOString().split('T')[0],
+        time: snapshot.snapshotTime,
+        type: 'contractdoc',
+        description,
+        changedBy: showUserInfo ? snapshot.createdByUserName : undefined,
+        details: {
+          documentCount: snapshot.contractDocuments.length,
+          changeType: snapshot.changeType,
+          reason: snapshot.changeReason,
+        },
+        snapshot,
+      });
+    });
+  }
+
   // Sort by time descending (most recent first)
   allEntries.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
@@ -197,6 +261,18 @@ export function CallOrderHistory({
               onClick={() => setFilter('staff')}
             >
               People Only
+            </button>
+            <button
+              className={`btn ${filter === 'lcat' ? 'primary' : 'outline'}`}
+              onClick={() => setFilter('lcat')}
+            >
+              Labor Categories Only
+            </button>
+            <button
+              className={`btn ${filter === 'contractdoc' ? 'primary' : 'outline'}`}
+              onClick={() => setFilter('contractdoc')}
+            >
+              Contract Files Only
             </button>
           </div>
 
@@ -260,6 +336,18 @@ export function CallOrderHistory({
                       <div style={{ fontSize: 13 }}>
                         <Eyebrow>Staff Count</Eyebrow>
                         <div>{entry.details.staffCount} personnel</div>
+                      </div>
+                    )}
+                    {entry.type === 'lcat' && (
+                      <div style={{ fontSize: 13 }}>
+                        <Eyebrow>Labor Categories</Eyebrow>
+                        <div>{entry.details.lcatCount} contracted</div>
+                      </div>
+                    )}
+                    {entry.type === 'contractdoc' && (
+                      <div style={{ fontSize: 13 }}>
+                        <Eyebrow>Contract Documents</Eyebrow>
+                        <div>{entry.details.documentCount} on file</div>
                       </div>
                     )}
                   </div>

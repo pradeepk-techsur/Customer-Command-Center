@@ -8,7 +8,7 @@ export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
 }) {
   const roleLabel = role === "pm" ? "Project Manager" : role === "program_manager" ? "Program Manager" : role === "admin" ? "Administrator" : "Customer";
   const isProgramManager = role === "program_manager";
-  // pm (Aiden/Jessica) can only reach the Approved Sign-in List within Admin, per decision #4.
+  // pm (Aidan/Jessica) can only reach the Approved Sign-in List within Admin, per decision #4.
   const canAccessAdmin = role === "admin" || role === "program_manager" || role === "pm";
 
   return (
