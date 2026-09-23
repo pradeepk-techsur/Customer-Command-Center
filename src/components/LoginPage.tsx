@@ -119,33 +119,6 @@ export function LoginPage({ onLogin, onShowRegister }: LoginPageProps) {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-          <button
-            type="button"
-            onClick={() => { setMode("password"); setMagicLinkMessage(""); setError(""); }}
-            style={{
-              flex: 1, padding: "8px", borderRadius: "4px", fontSize: "13px", fontWeight: 500,
-              border: mode === "password" ? "1px solid var(--accent)" : "1px solid var(--line-input)",
-              background: mode === "password" ? "var(--accent-tint)" : "var(--surface)",
-              color: mode === "password" ? "var(--accent)" : "var(--muted)", cursor: "pointer",
-            }}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode("magic-link"); setError(""); }}
-            style={{
-              flex: 1, padding: "8px", borderRadius: "4px", fontSize: "13px", fontWeight: 500,
-              border: mode === "magic-link" ? "1px solid var(--accent)" : "1px solid var(--line-input)",
-              background: mode === "magic-link" ? "var(--accent-tint)" : "var(--surface)",
-              color: mode === "magic-link" ? "var(--accent)" : "var(--muted)", cursor: "pointer",
-            }}
-          >
-            Email me a sign-in link
-          </button>
-        </div>
-
         {mode === "password" ? (
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: "20px" }}>

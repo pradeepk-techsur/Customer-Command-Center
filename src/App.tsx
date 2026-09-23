@@ -8,6 +8,7 @@ import { ContractDetailPage } from "./components/ContractDetailPage.tsx";
 import { StaffDetailPage } from "./components/StaffDetailPage.tsx";
 import { ActionItemsPage } from "./components/ActionItemsPage.tsx";
 import { ContractDeliverablesPage } from "./components/ContractDeliverablesPage.tsx";
+import { ContractFilePage } from "./components/ContractFilePage.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
 import { RegisterPage } from "./components/RegisterPage.tsx";
 import { AdminPage } from "./components/admin/AdminPage.tsx";
@@ -241,6 +242,8 @@ export default function App() {
         <ActionItemsPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
       ) : page === "deliverables" ? (
         <ContractDeliverablesPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
+      ) : page === "contractfile" ? (
+        <ContractFilePage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
       ) : selectedStaff ? (
         <StaffDetailPage staff={selectedStaff} isPm={canEdit} mutate={mutate} onBack={() => setSelectedStaffId(null)} />
       ) : order ? (

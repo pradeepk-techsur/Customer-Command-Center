@@ -25,6 +25,7 @@ interface ReportForm {
   risks: string;
   issues: string;
   actions: string;
+  narrative: string;
 }
 
 interface Week {
@@ -56,6 +57,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
     risks: "",
     issues: "",
     actions: "",
+    narrative: "",
   });
   const [saving, setSaving] = useState(false);
   
@@ -118,6 +120,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
           const risks = detail.groups.find((g: any) => g.label === "Risks")?.items.join("\n") || "";
           const issues = detail.groups.find((g: any) => g.label === "Issues")?.items.join("\n") || "";
           const actions = detail.groups.find((g: any) => g.label === "Customer actions")?.items.join("\n") || "";
+          const narrative = detail.groups.find((g: any) => g.label === "Recent news and discussion points")?.items.join("\n") || "";
           
           forms[coReport.callOrderId] = {
             weekEnding: detail.weekLabel,
@@ -127,6 +130,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
             risks,
             issues,
             actions,
+            narrative,
           };
         } catch (err) {
           // Silently skip reports that fail to load
@@ -193,6 +197,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
       const risks = report.groups.find((g: any) => g.label === "Risks")?.items.join("\n") || "";
       const issues = report.groups.find((g: any) => g.label === "Issues")?.items.join("\n") || "";
       const actions = report.groups.find((g: any) => g.label === "Customer actions")?.items.join("\n") || "";
+      const narrative = report.groups.find((g: any) => g.label === "Recent news and discussion points")?.items.join("\n") || "";
       
       setEditingReport({ ...report, callOrderName });
       setReportForm({
@@ -203,6 +208,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
         risks,
         issues,
         actions,
+        narrative,
       });
     } catch (err: any) {
       setError("Failed to load report: " + err.message);
@@ -219,6 +225,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
       risks: "",
       issues: "",
       actions: "",
+      narrative: "",
     });
   };
   
@@ -226,6 +233,7 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
     weekEnding: f.weekEnding, submittedBy: f.submittedBy,
     accomplishments: lines(f.accomplishments), planned: lines(f.planned),
     risks: lines(f.risks), issues: lines(f.issues), actions: lines(f.actions),
+    narrative: lines(f.narrative),
   });
 
   const handleSaveReport = async () => {
@@ -801,6 +809,21 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
                           
                           <div>
                             <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, fontSize: 14 }}>
+                              Recent News and Discussion Points
+                            </label>
+                            <TextArea
+                              rows={3}
+                              value={form.narrative}
+                              onChange={(val) => setDocForm({ 
+                                ...docForm, 
+                                [callOrderId]: { ...form, narrative: val }
+                              })}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, fontSize: 14 }}>
                               Risks
                             </label>
                             <TextArea
@@ -955,6 +978,14 @@ export function ProgramManagerWeeklyReports({ mutate }: { mutate: Mutate }) {
                   rows={5} 
                   value={reportForm.planned} 
                   onChange={(val) => setReportForm({ ...reportForm, planned: val })}
+                />
+              </Field>
+              
+              <Field label="Recent news and discussion points — one per line, for topics that aren't risks or issues">
+                <TextArea 
+                  rows={3} 
+                  value={reportForm.narrative} 
+                  onChange={(val) => setReportForm({ ...reportForm, narrative: val })}
                 />
               </Field>
               

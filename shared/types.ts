@@ -297,6 +297,7 @@ export const WEEKLY_SECTIONS = {
   risks: "Risks",
   issues: "Issues",
   actions: "Customer actions and decisions",
+  narrative: "Recent news and discussion points",
 } as const;
 
 export interface PortalConfig {
@@ -355,6 +356,7 @@ export interface WeeklyReportInput {
   risks: string[];
   issues: string[];
   actions: string[];
+  narrative?: string[]; // recent news / discussion points that aren't risks or issues
 }
 
 export interface MsrSectionInput {

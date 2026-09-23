@@ -478,6 +478,7 @@ app.post("/api/call-orders/:id/weekly-reports", authenticateRequest, requirePm, 
     [WEEKLY_SECTIONS.risks, orNA(lines(body.risks))],
     [WEEKLY_SECTIONS.issues, orNA(lines(body.issues))],
     [WEEKLY_SECTIONS.actions, orNA(lines(body.actions))],
+    [WEEKLY_SECTIONS.narrative, lines(body.narrative)],
   ];
   let order = 0;
   for (const [label, items] of sections) {
@@ -601,6 +602,7 @@ app.put("/api/call-orders/:id/weekly-reports/:reportId", authenticateRequest, re
     [WEEKLY_SECTIONS.risks, orNA(lines(body.risks))],
     [WEEKLY_SECTIONS.issues, orNA(lines(body.issues))],
     [WEEKLY_SECTIONS.actions, orNA(lines(body.actions))],
+    [WEEKLY_SECTIONS.narrative, lines(body.narrative)],
   ];
   let order = 0;
   for (const [label, items] of sections) {

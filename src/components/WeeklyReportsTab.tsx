@@ -13,7 +13,7 @@ const WSR_COLS = [
   { key: "by", label: "Submitted by" }, { key: "status", label: "Status", align: "right" as const },
 ];
 const COLS = "1fr 2fr 1fr 0.8fr";
-const emptyForm = { week: "", by: "", acc: "", plan: "", risk: "", issue: "", act: "" };
+const emptyForm = { week: "", by: "", acc: "", plan: "", risk: "", issue: "", act: "", narrative: "" };
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -83,6 +83,7 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
         risks: lines(wf.risk), 
         issues: lines(wf.issue), 
         actions: lines(wf.act),
+        narrative: lines(wf.narrative),
       }));
       setSaveStatus("saved");
       setLastSaved(new Date());
@@ -120,6 +121,7 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
     const risk = groups.find(g => g.label === "Risks")?.items.join("\n") || "";
     const issue = groups.find(g => g.label === "Issues")?.items.join("\n") || "";
     const act = groups.find(g => g.label === "Customer actions and decisions")?.items.join("\n") || "";
+    const narrative = groups.find(g => g.label === "Recent news and discussion points")?.items.join("\n") || "";
     
     setWf({ 
       week: report.weekLabel, 
@@ -128,7 +130,8 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
       plan, 
       risk, 
       issue, 
-      act 
+      act,
+      narrative,
     });
     setEditMode(true);
     setFormOpen(true);
@@ -147,6 +150,7 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
     return mutate(() => api.createWeekly(c.id, {
       weekEnding: wf.week, submittedBy: wf.by,
       accomplishments: lines(wf.acc), planned: lines(wf.plan), risks: lines(wf.risk), issues: lines(wf.issue), actions: lines(wf.act),
+      narrative: lines(wf.narrative),
     })).then((s) => {
       setFormOpen(false);
       setEditMode(false);
@@ -168,6 +172,7 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
     const s = await mutate(() => api.createWeekly(c.id, {
       weekEnding: wf.week, submittedBy: wf.by,
       accomplishments: lines(wf.acc), planned: lines(wf.plan), risks: lines(wf.risk), issues: lines(wf.issue), actions: lines(wf.act),
+      narrative: lines(wf.narrative),
     }));
     
     const created = s?.callOrders.find((x) => x.id === c.id)?.weeklyReports.find((r) => r.createdInPortal);
@@ -260,6 +265,9 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
               <Field label="Accomplishments — one per line"><TextArea rows={5} value={wf.acc} onChange={set("acc")} /></Field>
               <Field label="Planned activities — one per line"><TextArea rows={5} value={wf.plan} onChange={set("plan")} /></Field>
             </div>
+            <Field label="Recent news and discussion points — one per line, for topics that aren't risks or issues">
+              <TextArea rows={3} value={wf.narrative} onChange={set("narrative")} />
+            </Field>
             <div className="three-col">
               <Field label="Risks"><TextArea rows={3} value={wf.risk} onChange={set("risk")} /></Field>
               <Field label="Issues"><TextArea rows={3} value={wf.issue} onChange={set("issue")} /></Field>
