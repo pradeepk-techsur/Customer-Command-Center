@@ -6,7 +6,6 @@ import { Masthead, type Page } from "./components/Masthead.tsx";
 import { CallOrderDetail, type Tab } from "./components/CallOrderDetail.tsx";
 import { ContractDetailPage } from "./components/ContractDetailPage.tsx";
 import { StaffDetailPage } from "./components/StaffDetailPage.tsx";
-import { ActionItemsPage } from "./components/ActionItemsPage.tsx";
 import { ContractDeliverablesPage } from "./components/ContractDeliverablesPage.tsx";
 import { ContractFilePage } from "./components/ContractFilePage.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
@@ -238,8 +237,6 @@ export default function App() {
         <AdminPage role={user?.role || "customer"} />
       ) : !snapshot ? (
         <div className="loading">{error ? "The portal data could not be loaded." : "Loading portal data…"}</div>
-      ) : page === "actionitems" ? (
-        <ActionItemsPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
       ) : page === "deliverables" ? (
         <ContractDeliverablesPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
       ) : page === "contractfile" ? (

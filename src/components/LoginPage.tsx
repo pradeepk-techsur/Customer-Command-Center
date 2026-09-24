@@ -6,7 +6,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin, onShowRegister }: LoginPageProps) {
-  const [mode, setMode] = useState<"password" | "magic-link">("password");
+  const [mode] = useState<"password" | "magic-link">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

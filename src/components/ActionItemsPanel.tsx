@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ActionItem } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { dateLabel, daysOld } from "../lib/format.ts";
-import { Button, Eyebrow, Field, TextInput } from "./ui.tsx";
+import { Button, Field, TextInput } from "./ui.tsx";
 import type { Mutate } from "../App.tsx";
 
 /** Open items, plus closed items from the last week only — older closed items live in the searchable archive. */
@@ -20,7 +20,6 @@ export function ActionItemsPanel({ callOrderId, weeklyReportId, actionItems, tod
 
   return (
     <div>
-      <Eyebrow>Action items</Eyebrow>
       {visible.map((a) => (
         <div key={a.id} className="report-item" style={{ opacity: a.status === "closed" ? 0.6 : 1 }}>
           <div className="dash">—</div>

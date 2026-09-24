@@ -622,6 +622,10 @@ ALTER TABLE deliverables ADD COLUMN IF NOT EXISTS period_label text;
 -- Free-text description shown on the call order's General tab.
 ALTER TABLE call_orders ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
 
+-- Free-text narrative shown on the call order's General tab, underneath the description — captures
+-- customer weekly-call talking points that aren't a risk or issue.
+ALTER TABLE call_orders ADD COLUMN IF NOT EXISTS narrative text NOT NULL DEFAULT '';
+
 -- Labor category snapshots: same pattern as staff_snapshots, captures full LCAT list at each change.
 create table if not exists labor_category_snapshots (
   id                bigserial primary key,

@@ -186,6 +186,15 @@ app.patch("/api/call-orders/:id/description", authenticateRequest, requirePm, re
   await audit(db, req, "call_order.description", "call_order", c.id, { groupKey: c.group_key, from: c.description, to: description });
 }));
 
+// Narrative belongs to the call order (not a single funded period), so it applies to every period sharing this group.
+app.patch("/api/call-orders/:id/narrative", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
+  const c = await callOrderOr404(db, req.params.id as string, res);
+  if (!c) return false;
+  const narrative = String(req.body?.narrative ?? "").trim();
+  await db.query("update call_orders set narrative = $2 where group_key = $1", [c.group_key, narrative]);
+  await audit(db, req, "call_order.narrative", "call_order", c.id, { groupKey: c.group_key, from: c.narrative, to: narrative });
+}));
+
 // Edits period-of-performance dates, funding, and PM for a single funded period. Also finishes
 // setup (clears `pending`) once dates and a funded amount have been entered for an uploaded call order.
 app.patch("/api/call-orders/:id/setup", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
@@ -240,9 +249,9 @@ app.post("/api/call-orders/:groupKey/periods", authenticateRequest, requirePm, m
   const newId = nextPeriodId(base, siblings.map((s) => s.id));
 
   await db.query(
-    `insert into call_orders (id, group_key, group_name, name, description, pop_label, pop_start, pop_end, funded, spend, pm, pending, highlights, sort_order)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10,false,'[]'::jsonb, coalesce((select max(sort_order) + 1 from call_orders where group_key = $2), 0))`,
-    [newId, groupKey, sibling.group_name, sibling.name, sibling.description, formatPop(popStart, popEnd), popStart, popEnd, funded, sibling.pm],
+    `insert into call_orders (id, group_key, group_name, name, description, narrative, pop_label, pop_start, pop_end, funded, spend, pm, pending, highlights, sort_order)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,false,'[]'::jsonb, coalesce((select max(sort_order) + 1 from call_orders where group_key = $2), 0))`,
+    [newId, groupKey, sibling.group_name, sibling.name, sibling.description, sibling.narrative, formatPop(popStart, popEnd), popStart, popEnd, funded, sibling.pm],
   );
   await audit(db, req, "call_order.period.create", "call_order", newId, { groupKey, popStart, popEnd, funded });
 }));

@@ -22,6 +22,10 @@ export function GeneralTab({ order: c, group, today, isPm, mutate }: {
   useEffect(() => { setDraft(c.description); }, [c.id, c.description]);
   const saveDescription = () => { if (draft !== c.description) mutate(() => api.saveDescription(c.id, draft)); };
 
+  const [narrativeDraft, setNarrativeDraft] = useState(c.narrative);
+  useEffect(() => { setNarrativeDraft(c.narrative); }, [c.id, c.narrative]);
+  const saveNarrative = () => { if (narrativeDraft !== c.narrative) mutate(() => api.saveNarrative(c.id, narrativeDraft)); };
+
   return (
     <div className="fin-grid">
       <div className="card">
@@ -41,17 +45,35 @@ export function GeneralTab({ order: c, group, today, isPm, mutate }: {
         <div className="footnote">"Current" is highlighted in red when the period ends within 60 days.</div>
       </div>
 
-      <div className="card">
-        <div className="card-head">Call order description</div>
-        {isPm ? (
-          <div style={{ padding: 18 }}>
-            <TextArea rows={4} value={draft} onChange={setDraft} onBlur={saveDescription} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="card">
+          <div className="card-head">Call order description</div>
+          {isPm ? (
+            <div style={{ padding: 18 }}>
+              <TextArea rows={4} value={draft} onChange={setDraft} onBlur={saveDescription} />
+            </div>
+          ) : (
+            <div style={{ padding: 18, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+              {c.description || "No description has been entered for this call order."}
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card-head">Narrative</div>
+          <div className="footnote" style={{ padding: "0 20px" }}>
+            Talking points for the weekly customer call that aren't a risk or issue.
           </div>
-        ) : (
-          <div style={{ padding: 18, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-            {c.description || "No description has been entered for this call order."}
-          </div>
-        )}
+          {isPm ? (
+            <div style={{ padding: 18 }}>
+              <TextArea rows={4} value={narrativeDraft} onChange={setNarrativeDraft} onBlur={saveNarrative} />
+            </div>
+          ) : (
+            <div style={{ padding: 18, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+              {c.narrative || "No narrative has been entered for this call order."}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

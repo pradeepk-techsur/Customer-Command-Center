@@ -258,7 +258,7 @@ export async function buildSnapshot(
       });
     }
     return {
-      id: c.id, groupKey: c.group_key, groupName: c.group_name, name: c.name, description: c.description || "", pop: c.pop_label,
+      id: c.id, groupKey: c.group_key, groupName: c.group_name, name: c.name, description: c.description || "", narrative: c.narrative || "", pop: c.pop_label,
       popStart: c.pop_start, popEnd: c.pop_end, funded: c.funded, spend: c.spend, eac: c.eac, over: c.over_under,
       pm: c.pm, pending: c.pending, highlights: c.highlights, finUpdatedOn: c.fin_updated_on, peopleUpdatedOn: c.people_updated_on,
       laborCategories: lcats.rows.filter((l) => l.call_order_id === c.id).map((l) => ({

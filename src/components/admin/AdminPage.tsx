@@ -220,7 +220,7 @@ export function AdminPage({ role }: { role: Role }) {
 
   // Show audit log tab if viewing audit
   if (activeTab === "audit") {
-    return <AuditLogPage />;
+    return <AuditLogPage onSwitchTab={setActiveTab} />;
   }
 
   // Approved sign-in list: Paul, Aidan, and Jessica (pm/program_manager/admin) can all manage it.

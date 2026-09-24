@@ -1,4 +1,4 @@
-import type { MsrSectionInput, PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
+import type { PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
 
 // Authentication tokens stored in memory and localStorage
 let accessToken: string | null = null;
@@ -118,6 +118,7 @@ export const api = {
   uploadCallOrders: (list: FileList) => request("/api/call-orders/upload", { method: "POST", body: files(list) }),
   saveSpend: (id: string, spend: string) => request(`/api/call-orders/${enc(id)}/spend`, { method: "PATCH", body: json({ spend }) }),
   saveDescription: (id: string, description: string) => request(`/api/call-orders/${enc(id)}/description`, { method: "PATCH", body: json({ description }) }),
+  saveNarrative: (id: string, narrative: string) => request(`/api/call-orders/${enc(id)}/narrative`, { method: "PATCH", body: json({ narrative }) }),
   saveCallOrderSetup: (id: string, input: { popStart?: string; popEnd?: string; funded?: string; eac?: string; overUnder?: string; pm?: string }) =>
     request(`/api/call-orders/${enc(id)}/setup`, { method: "PATCH", body: json(input) }),
   addCallOrderPeriod: (groupKey: string, input: { popStart: string; popEnd: string; funded?: string }) =>
@@ -209,20 +210,10 @@ export const api = {
   updateLcat: (lcatId: number, input: { name?: string; fte?: string; hours?: string; rate?: string }) =>
     request(`/api/staffing/labor-categories/${lcatId}`, { method: "PATCH", body: json(input) }),
   removeLcat: (lcatId: number) => request(`/api/staffing/labor-categories/${lcatId}`, { method: "DELETE" }),
-  addStaffTransfer: (input: { staffId: number; toCallOrderId?: string; toLcat?: string; effectiveDate: string; notes?: string }) =>
-    request(`/api/staffing/transfers`, { method: "POST", body: json(input) }),
-  completeStaffTransfer: (transferId: number) => request(`/api/staffing/transfers/${transferId}/complete`, { method: "POST" }),
-  removeStaffTransfer: (transferId: number) => request(`/api/staffing/transfers/${transferId}`, { method: "DELETE" }),
   createWeekly: (id: string, input: WeeklyReportInput) => request(`/api/call-orders/${enc(id)}/weekly-reports`, { method: "POST", body: json(input) }),
   uploadWeekly: (id: string, list: FileList) => request(`/api/call-orders/${enc(id)}/weekly-reports/upload`, { method: "POST", body: files(list) }),
   editWeekly: (id: string, reportId: number, input: WeeklyReportInput) => request(`/api/call-orders/${enc(id)}/weekly-reports/${reportId}`, { method: "PUT", body: json(input) }),
   submitWeekly: (id: string, reportId: number) => request(`/api/call-orders/${enc(id)}/weekly-reports/${reportId}/submit`, { method: "POST" }),
-  createMonthly: (period: string, mode: "blank" | "draft") => request("/api/monthly-reports", { method: "POST", body: json({ period, mode }) }),
-  uploadMonthly: (period: string, list: FileList) => request("/api/monthly-reports/upload", { method: "POST", body: files(list, { period }) }),
-  createPmMonthly: (period: string, mode: "blank" | "draft") => request("/api/pm/monthly-reports", { method: "POST", body: json({ period, mode }) }),
-  saveSection: (reportId: number, callOrderId: string, input: MsrSectionInput) =>
-    request(`/api/monthly-reports/${reportId}/sections/${enc(callOrderId)}`, { method: "PUT", body: json(input) }),
-  submitMonthlyToCustomer: (reportId: number) => request(`/api/monthly-reports/${reportId}/submit`, { method: "POST" }),
   
   // Authentication endpoints
   async getMe() {
@@ -252,38 +243,4 @@ export const api = {
     return res.json();
   },
   
-  async getConsolidatedWeeklyReport(weekEnding: string) {
-    const res = await fetch(`/api/weekly-reports/consolidated/${weekEnding}`, {
-      headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
-    });
-    if (!res.ok) throw new Error("Failed to fetch consolidated weekly report");
-    return res.json();
-  },
-  
-  async submitConsolidatedWeeklyReport(weekEnding: string) {
-    return request(`/api/weekly-reports/consolidated/${weekEnding}/submit`, { method: "POST" });
-  },
-  
-  async getCustomerWeeklyReports() {
-    const res = await fetch("/api/weekly-reports/customer", {
-      headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
-    });
-    if (!res.ok) throw new Error("Failed to fetch customer weekly reports");
-    return res.json();
-  },
-  
-  async getWeeklyReport(callOrderId: string, reportId: number) {
-    const res = await fetch(`/api/call-orders/${callOrderId}/weekly-reports/${reportId}`, {
-      headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
-    });
-    if (!res.ok) throw new Error("Failed to fetch weekly report");
-    return res.json();
-  },
-  
-  async updateWeeklyReport(callOrderId: string, reportId: number, data: WeeklyReportInput) {
-    return request(`/api/call-orders/${callOrderId}/weekly-reports/${reportId}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
-  },
 };

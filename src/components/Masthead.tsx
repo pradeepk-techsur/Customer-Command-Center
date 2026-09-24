@@ -1,6 +1,6 @@
 import type { Role } from "../../shared/types.ts";
 
-export type Page = "orders" | "admin" | "actionitems" | "deliverables" | "contractfile";
+export type Page = "orders" | "admin" | "deliverables" | "contractfile";
 
 export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
   page: Page; role: Role; userName?: string; contract: { agency: string; vehicle: string; number: string };
@@ -20,7 +20,6 @@ export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
       <div className="masthead-nav">
         <nav className="nav-tabs">
           <button type="button" className={"nav-tab" + (page === "orders" ? " active" : "")} onClick={() => onPage("orders")}>BPA Dashboard</button>
-          <button type="button" className={"nav-tab" + (page === "actionitems" ? " active" : "")} onClick={() => onPage("actionitems")}>Action Items</button>
           <button type="button" className={"nav-tab" + (page === "deliverables" ? " active" : "")} onClick={() => onPage("deliverables")}>Contracts Deliverables</button>
           <button type="button" className={"nav-tab" + (page === "contractfile" ? " active" : "")} onClick={() => onPage("contractfile")}>Contract File</button>
           {canAccessAdmin && (

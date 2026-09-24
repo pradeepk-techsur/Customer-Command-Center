@@ -81,6 +81,7 @@ export interface CallOrder {
   groupName: string;
   name: string;
   description: string;
+  narrative: string;
   pop: string;
   popStart: string | null;
   popEnd: string | null;

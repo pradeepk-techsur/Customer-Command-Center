@@ -13,15 +13,16 @@ import { InvoicesTab } from "./InvoicesTab.tsx";
 import { ContractFileTab } from "./ContractFileTab.tsx";
 import { RisksTab } from "./RisksTab.tsx";
 import { IssuesTab } from "./IssuesTab.tsx";
+import { ActionItemsPanel } from "./ActionItemsPanel.tsx";
 import type { Mutate } from "../App.tsx";
 
-export type Tab = "General" | "Financials" | "People" | "Invoices" | "Contract File" | "Risks" | "Issues" | "Weekly Status Reports" | "History";
+export type Tab = "General" | "Financials" | "People" | "Invoices" | "Contract File" | "Risks" | "Issues" | "Action Items" | "Weekly Status Reports" | "History";
 
 // Only Project Managers get Weekly Reports tab in call orders
 // Program Managers, Admins, and Customers use top navigation tabs
 // History tab is available to all roles
 function getTabs(role: string): Tab[] {
-  const baseTabs: Tab[] = ["General", "Financials", "Invoices", "Contract File", "People", "Risks", "Issues"];
+  const baseTabs: Tab[] = ["General", "Financials", "Invoices", "Contract File", "People", "Risks", "Issues", "Action Items"];
   if (role === "pm") {
     baseTabs.push("Weekly Status Reports");
   }
@@ -107,6 +108,14 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBac
       {tab === "People" && <PeopleTab order={c} snapshot={snapshot} isPm={isPm} mutate={mutate} onSelectStaff={onSelectStaff} />}
       {tab === "Risks" && <RisksTab callOrderId={c.id} risks={c.risks} isPm={isPm} mutate={mutate} />}
       {tab === "Issues" && <IssuesTab callOrderId={c.id} issues={c.issues} isPm={isPm} mutate={mutate} />}
+      {tab === "Action Items" && (
+        <div className="card">
+          <div className="card-head">Action items</div>
+          <div style={{ padding: 18 }}>
+            <ActionItemsPanel callOrderId={c.id} actionItems={c.actionItems} today={today} isPm={isPm} mutate={mutate} />
+          </div>
+        </div>
+      )}
       {tab === "Weekly Status Reports" && <WeeklyReportsTab order={c} isPm={isPm} userName={userName} today={snapshot.today} mutate={mutate} />}
       {tab === "History" && <CallOrderHistory callOrderId={c.id} userRole={snapshot.actor?.role || 'customer'} />}
     </div>

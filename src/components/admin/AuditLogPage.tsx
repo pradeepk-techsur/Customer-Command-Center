@@ -4,7 +4,7 @@ import { getAccessToken } from "../../api.ts";
 import { Button, Field, TextInput } from "../ui.tsx";
 import { dateLabel } from "../../lib/format.ts";
 
-export function AuditLogPage() {
+export function AuditLogPage({ onSwitchTab }: { onSwitchTab?: (tab: "users" | "audit" | "approved") => void }) {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +110,14 @@ export function AuditLogPage() {
             <h1>Audit Log</h1>
             <p className="page-subtitle">Complete system audit trail (admin only)</p>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            {onSwitchTab && (
+              <div className="tabs" style={{ marginBottom: 0 }}>
+                <button type="button" className="tab" onClick={() => onSwitchTab("users")}>Users</button>
+                <button type="button" className="tab active" onClick={() => onSwitchTab("audit")}>Audit Log</button>
+                <button type="button" className="tab" onClick={() => onSwitchTab("approved")}>Approved Sign-in List</button>
+              </div>
+            )}
             <Button onClick={exportToCsv} disabled={logs.length === 0}>
               Export to CSV
             </Button>
