@@ -89,7 +89,7 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
               return (
                 <div key={s.id} className="grid trow roster" style={{ gridTemplateColumns: cols }}>
                   {onSelectStaff ? (
-                    <button type="button" className={nameClass(s) + " link-text"} style={{ textAlign: "left" }} onClick={() => onSelectStaff(s.id)}>{s.name}</button>
+                    <button type="button" className={nameClass(s) + " link-text text-button"} style={{ textAlign: "left" }} onClick={() => onSelectStaff(s.id)}>{s.name}</button>
                   ) : (
                     <div className={nameClass(s)}>{s.name}</div>
                   )}
@@ -100,7 +100,7 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
                       <select className="select" value={s.status} onChange={(e) => mutate(() => api.setStaffStatus(s.id, e.target.value))}>
                         {options.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
-                      <button type="button" className="link-text right" onClick={() => startEdit(s)}>Edit</button>
+                      <button type="button" className="link-text text-button right" onClick={() => startEdit(s)}>Edit</button>
                       <button type="button" className="remove-btn" title="Remove person" onClick={() => mutate(() => api.removeStaff(s.id))}>×</button>
                     </>
                   ) : (

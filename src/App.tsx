@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PortalSnapshot, Role } from "../shared/types.ts";
-import { api, setTokens, getAccessToken } from "./api.ts";
+import type { CallOrderSetupInput, PortalSnapshot, Role } from "../shared/types.ts";
+import { api, setTokens, getAccessToken, SESSION_EXPIRED_EVENT } from "./api.ts";
 import { SortContext, type SortState } from "./hooks/useSort.ts";
 import { Masthead, type Page } from "./components/Masthead.tsx";
 import { CallOrderDetail, type Tab } from "./components/CallOrderDetail.tsx";
@@ -12,6 +12,7 @@ import { LoginPage } from "./components/LoginPage.tsx";
 import { RegisterPage } from "./components/RegisterPage.tsx";
 import { AdminPage } from "./components/admin/AdminPage.tsx";
 import { ChangePasswordModal } from "./components/ChangePasswordModal.tsx";
+import { CallOrderSetupPage } from "./components/CallOrderSetupPage.tsx";
 import { ToastContainer, ConfirmDialog } from "./components/ui.tsx";
 
 /** Runs a mutation against the API and replaces the snapshot with the server's response. */
@@ -37,7 +38,23 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("General");
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+  const [setupTarget, setSetupTarget] = useState<"create" | string | null>(null);
   const [sorts, setSorts] = useState<Record<string, SortState>>({});
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+      setSnapshot(null);
+      setSelected(null);
+      setSelectedStaffId(null);
+      setSetupTarget(null);
+      setPage("orders");
+      setShowRegister(false);
+      setError("Your session expired. Please log in again.");
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
 
   // Check authentication on mount and handle OAuth callback
   useEffect(() => {
@@ -142,6 +159,7 @@ export default function App() {
 
   const handleLogin = async (accessToken: string, refreshToken: string) => {
     setTokens(accessToken, refreshToken);
+    setError(null);
     try {
       const userData = await api.getMe();
       if (userData) {
@@ -156,6 +174,7 @@ export default function App() {
     await api.logout();
     setUser(null);
     setSnapshot(null);
+    setSetupTarget(null);
   };
 
   const handlePasswordChangeSuccess = async () => {
@@ -207,13 +226,16 @@ export default function App() {
       <LoginPage 
         onLogin={handleLogin} 
         onShowRegister={() => setShowRegister(true)} 
+        message={error ?? undefined}
       />
     );
   }
 
   // canEdit: pm and program_manager can edit their assigned call orders
   const canEdit = user.role === "pm" || user.role === "program_manager" || user.role === "admin";
+  const canManageCallOrders = user.role === "program_manager" || user.role === "admin";
   const order = snapshot && selected ? snapshot.callOrders.find((c) => c.id === selected) : undefined;
+  const setupOrder = snapshot && setupTarget && setupTarget !== "create" ? snapshot.callOrders.find((c) => c.id === setupTarget) : undefined;
   const selectedStaff = snapshot && selectedStaffId ? snapshot.callOrders.flatMap((c) => c.staff).find((s) => s.id === selectedStaffId) : undefined;
   const fallbackContract = { id: 0, name: "BPA", agency: "AOUSC", vehicle: "BPA for TSO Support Services", number: "47QTCA20D00C6", popStart: null, popEnd: null, funded: 0, spend: 0, eac: null, peopleAssigned: 0, clins: [], invoices: [], contractDocuments: [], deliverables: [], risks: [], issues: [] };
 
@@ -227,7 +249,7 @@ export default function App() {
         role={user.role} 
         userName={user.name}
         contract={snapshot?.contract || fallbackContract}
-        onPage={(p) => { setPage(p); if (p === "orders") { setSelected(null); setSelectedStaffId(null); } }} 
+        onPage={(p) => { setPage(p); setSetupTarget(null); if (p === "orders") { setSelected(null); setSelectedStaffId(null); } }}
         onLogout={handleLogout}
       />
       {error && (
@@ -241,13 +263,34 @@ export default function App() {
         <ContractDeliverablesPage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
       ) : page === "contractfile" ? (
         <ContractFilePage snapshot={snapshot} isPm={canEdit} mutate={mutate} />
+      ) : setupTarget ? (
+        <CallOrderSetupPage
+          mode={setupTarget === "create" ? "create" : "edit"}
+          order={setupOrder}
+          onCancel={() => setSetupTarget(null)}
+          onSubmit={async (input: CallOrderSetupInput, award?: File) => {
+            const next = await mutate(() => setupTarget === "create"
+              ? api.createCallOrder(input, award)
+              : api.saveCallOrderSetup(setupTarget, input));
+            if (!next) return false;
+            if (setupTarget === "create") {
+              const number = Number(input.callNumber?.match(/\d+/)?.[0]);
+              const created = next.callOrders.find((c) => c.id === `Call ${number}`);
+              if (created) { setSelected(created.id); setTab("General"); }
+            }
+            setSetupTarget(null);
+            return true;
+          }}
+        />
       ) : selectedStaff ? (
         <StaffDetailPage staff={selectedStaff} isPm={canEdit} mutate={mutate} onBack={() => setSelectedStaffId(null)} />
       ) : order ? (
-        <CallOrderDetail snapshot={snapshot} order={order} tab={tab} isPm={canEdit} userName={user.name} mutate={mutate}
-          onBack={() => setSelected(null)} onTab={setTab} onSelectPeriod={setSelected} onSelectStaff={setSelectedStaffId} />
+        <CallOrderDetail snapshot={snapshot} order={order} tab={tab} isPm={canEdit} canManageCallOrders={canManageCallOrders} userName={user.name} mutate={mutate}
+          onBack={() => setSelected(null)} onEditSetup={() => setSetupTarget(order.id)} onTab={setTab} onSelectPeriod={setSelected} onSelectStaff={setSelectedStaffId} />
       ) : (
         <ContractDetailPage snapshot={snapshot}
+          canManageCallOrders={canManageCallOrders}
+          onAddCallOrder={() => setSetupTarget("create")}
           onSelectCallOrder={(id) => { setSelected(id); setTab("General"); }} />
       )}
       </SortContext.Provider>

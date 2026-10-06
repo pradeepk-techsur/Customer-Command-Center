@@ -28,11 +28,11 @@ export function Button({ primary, onClick, children, disabled }: { primary?: boo
 }
 
 /** A button that opens the OS file picker and hands the chosen files to onFiles. */
-export function FileButton({ onFiles, children, primary, className }: { onFiles: (f: FileList) => void; children: ReactNode; primary?: boolean; className?: string }) {
+export function FileButton({ onFiles, children, primary, className, accept, multiple = true }: { onFiles: (f: FileList) => void; children: ReactNode; primary?: boolean; className?: string; accept?: string; multiple?: boolean }) {
   return (
     <label className={className || ("btn" + (primary ? " primary" : ""))}>
       {children}
-      <input type="file" multiple onChange={(e) => { if (e.target.files && e.target.files.length) onFiles(e.target.files); e.target.value = ""; }} />
+      <input type="file" accept={accept} multiple={multiple} onChange={(e) => { if (e.target.files && e.target.files.length) onFiles(e.target.files); e.target.value = ""; }} />
     </label>
   );
 }

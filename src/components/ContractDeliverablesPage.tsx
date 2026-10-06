@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Deliverable, PortalSnapshot } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
-import { dateLabel } from "../lib/format.ts";
+import { callOrderLabel, dateLabel } from "../lib/format.ts";
 import { Button, Field, FileButton, SortHeaders, TextInput } from "./ui.tsx";
 import type { Mutate } from "../App.tsx";
 
@@ -24,7 +24,7 @@ export function ContractDeliverablesPage({ snapshot, isPm, mutate }: { snapshot:
   const callOrders = snapshot.callOrders.filter((c) => !c.pending);
   const rows: Row[] = [
     ...snapshot.contract.deliverables.map((d) => ({ ...d, scopeName: "BPA" })),
-    ...callOrders.flatMap((c) => c.deliverables.map((d) => ({ ...d, scopeName: c.name }))),
+    ...callOrders.flatMap((c) => c.deliverables.map((d) => ({ ...d, scopeName: callOrderLabel(c.name, c.id) }))),
   ];
   const { sorted, cur, toggle } = useSort("contractdeliverables", "dueDate", rows, {
     name: (d) => d.name,

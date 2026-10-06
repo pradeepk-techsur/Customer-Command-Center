@@ -106,6 +106,27 @@ export interface CallOrder {
   actionItems: ActionItem[];
 }
 
+export interface CallOrderSetupInput {
+  callNumber?: string;
+  name: string;
+  description: string;
+  narrative: string;
+  popStart: string;
+  popEnd: string;
+  funded: string;
+  spend: string;
+  eac: string;
+  overUnder: string;
+  pm: string;
+}
+
+export interface CallOrderAwardPreview {
+  externalOrderNumber: string | null;
+  awardDate: string | null;
+  draft: CallOrderSetupInput;
+  warnings: string[];
+}
+
 // ============================================================================
 // Contract Tab: BPA record, CLINs, invoices, contract documents, deliverables
 // ============================================================================

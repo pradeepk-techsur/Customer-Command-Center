@@ -116,8 +116,8 @@ export const DATA: SeedCallOrder[] = [
     highlights: ["Expansion positions beginning 9/25 at the start of the new option period: two Agile Coach/Consultant – Senior and one Business Systems Analyst – Mid.","Shawn Faunce and Megan Giesy move over from the ZTA call order for the Agile Coach/Consultant roles.","Mary Raguso moves over from ZTA for the Business Systems Analyst – Mid position."]
   },
   {
-    id: "Call 16.1", group: "Call 016", groupName: "Reliability & Availability Engineering (RAE)", name: "Reliability & Availability Engineering (RAE)",
-    description: "Reliability and availability engineering support for monitoring, incident management, and system resilience across judiciary IT platforms.",
+    id: "Call 16.1", group: "Call 016", groupName: "Research, Architecture & Engineering Support", name: "Research, Architecture & Engineering Support",
+    description: "Research, Architecture & Engineering support.",
     pop: "2/26/26 – 2/25/27",
     funded: 3383404.80, spend: 1270961.22, remaining: 2112443.58, eac: 3139912.02, over: 243492.78,
     pm: "Andrew Camp",
@@ -291,7 +291,7 @@ export const MONTHLY_REPORTS: SeedMonthlyReport[] = [
         travel: "N/A"
       },
       "Call 16.1": {
-        title: "Call Order 016 – RAE Support",
+        title: "Call Order 016 – Research, Architecture & Engineering Support",
         funding: [["Funds Obligated", 3383404.80], ["Funds Expended to Date", 533577.96], ["Funds Remaining", 2849826.84], ["Estimate at Completion", 3260861.72], ["Over/Under", 122543.08]],
         completed: [
           ["Project Management & PMO Support", "Provided PMO support to TSIO, including PM process improvement workshops, contract deliverable verification, project inventory assessment, and ongoing PM guidance. Continued PM support for the Sealed Document Security (SDS) Project. Provided PM support for the ETSD AI Strategy Initiative, AI Gateway, and Courtroom Technology. Began onboarding new Agile Coach resource, Ram Dasari."],

@@ -17,6 +17,10 @@ export function usdFull(n: number | null | undefined): string {
 
 export const rate = (n: number) => "$" + Number(n).toFixed(2);
 
+export function callOrderLabel(name: string, number?: string | null): string {
+  return number ? `${name} (${number})` : name;
+}
+
 export const isVacant = (name: string) => /^VACANT/i.test(name);
 export const isDeparted = (status: string) => /offboarded|no longer available/i.test(status || "");
 export const isAssigned = (s: StaffMember) => !isVacant(s.name) && !isDeparted(s.status);

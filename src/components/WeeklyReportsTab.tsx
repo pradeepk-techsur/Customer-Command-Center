@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import type { CallOrder, WeeklyReport } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { useSort } from "../hooks/useSort.ts";
-import { lines, localDate, todayLabel } from "../lib/format.ts";
+import { callOrderLabel, lines, localDate, todayLabel } from "../lib/format.ts";
 import { Button, Eyebrow, Field, FileButton, SortHeaders, TextArea, TextInput } from "./ui.tsx";
 import { WeeklySummaryPanel } from "./WeeklySummaryPanel.tsx";
 import { ActionItemsPanel } from "./ActionItemsPanel.tsx";
@@ -316,7 +316,7 @@ export function WeeklyReportsTab({ order: c, isPm, userName, today, mutate }: { 
           <div>
             <div className="pane-title">{open ? (open.createdInPortal ? `Weekly Status Report — week ending ${open.weekLabel}` : `Weekly Touchpoint — ${open.weekLabel}`) : "No report selected"}</div>
             <div className="pane-sub">
-              {open ? `${c.id.replace(/^Call\s+/i, '').split('.')[0]} · ${open.file}${open.submittedBy ? " · " + open.submittedBy : ""}` : ""}
+              {open ? `${callOrderLabel(c.name, c.id)} · ${open.file}${open.submittedBy ? " · " + open.submittedBy : ""}` : ""}
               {open && open.statusV2 === 'draft' && <span style={{ marginLeft: 8, color: '#f57c00', fontWeight: 'bold' }}>· DRAFT</span>}
             </div>
           </div>

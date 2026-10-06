@@ -24,6 +24,7 @@ import risksIssuesRouter from "./routes/risks-issues.ts";
 import staffingRouter from "./routes/staffing.ts";
 import actionItemsRouter, { archiveRouter as actionItemsArchiveRouter } from "./routes/action-items.ts";
 import approvedUsersRouter from "./routes/approved-users.ts";
+import callOrdersRouter from "./routes/call-orders.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -81,6 +82,7 @@ app.use("/api/scope/:callOrderId/action-items", actionItemsRouter);
 app.use("/api/scope/:callOrderId/risks-issues", risksIssuesRouter);
 app.use("/api/action-items/archive", actionItemsArchiveRouter);
 app.use("/api/staffing", staffingRouter);
+app.use("/api/call-orders", callOrdersRouter);
 
 type Db = pg.PoolClient;
 
@@ -148,24 +150,6 @@ app.get("/api/audit", requirePm, async (req, res, next) => {
 
 // ---- Call orders -------------------------------------------------------------------------------
 
-app.post("/api/call-orders/upload", requirePm, upload.array("files"), mutation(async (db, req, res) => {
-  const files = (req.files as Express.Multer.File[]) || [];
-  if (!files.length) { res.status(400).json({ error: "No files were uploaded." }); return false; }
-  const { rows } = await db.query<{ n: number }>("select count(*)::int as n from call_orders where pending");
-  let n = rows[0].n;
-  for (const f of files) {
-    n += 1;
-    const id = `New ${n}`;
-    const name = f.originalname.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
-    await db.query(
-      `insert into call_orders (id, group_key, group_name, name, pop_label, funded, spend, pm, pending, highlights, sort_order)
-       values ($1,$1,$2,$2,'To be entered',0,0,'Unassigned',true,$3,-1)`,
-      [id, name, JSON.stringify([`Uploaded from ${f.originalname}. Funding, staffing, and period of performance pending setup.`])],
-    );
-    await audit(db, req, "call_order.upload", "call_order", id, { file: f.originalname, stored: `/uploads/${f.filename}` });
-  }
-}));
-
 app.patch("/api/call-orders/:id/spend", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
   const c = await callOrderOr404(db, req.params.id as string, res);
   if (!c) return false;
@@ -195,34 +179,6 @@ app.patch("/api/call-orders/:id/narrative", authenticateRequest, requirePm, requ
   await audit(db, req, "call_order.narrative", "call_order", c.id, { groupKey: c.group_key, from: c.narrative, to: narrative });
 }));
 
-// Edits period-of-performance dates, funding, and PM for a single funded period. Also finishes
-// setup (clears `pending`) once dates and a funded amount have been entered for an uploaded call order.
-app.patch("/api/call-orders/:id/setup", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
-  const c = await callOrderOr404(db, req.params.id as string, res);
-  if (!c) return false;
-  const popStart = str(req.body?.popStart) ?? c.pop_start;
-  const popEnd = str(req.body?.popEnd) ?? c.pop_end;
-  if (popStart && popEnd && popEnd < popStart) {
-    res.status(400).json({ error: "Period of performance end date must be after the start date." });
-    return false;
-  }
-  const funded = req.body?.funded !== undefined ? num(req.body.funded) : c.funded;
-  const eac = req.body?.eac !== undefined ? num(req.body.eac) : c.eac;
-  const overUnder = req.body?.overUnder !== undefined ? num(req.body.overUnder) : c.over_under;
-  const pm = str(req.body?.pm) ?? c.pm;
-  if (funded === null || funded < 0) { res.status(400).json({ error: "Funded amount must be a non-negative amount." }); return false; }
-  const popLabel = formatPop(popStart, popEnd);
-  const nowComplete = c.pending && !!popStart && !!popEnd && funded > 0;
-
-  await captureCallOrderSnapshot(db, c.id, req.user?.id ?? null, "Call order setup updated", ["funded", "eac", "over_under", "pop_start", "pop_end", "pm"]);
-  await db.query(
-    `update call_orders set pop_label = $2, pop_start = $3, pop_end = $4, funded = $5, eac = $6, over_under = $7, pm = $8,
-       pending = $9, fin_updated_on = current_date where id = $1`,
-    [c.id, popLabel, popStart, popEnd, funded, eac, overUnder, pm, nowComplete ? false : c.pending],
-  );
-  await audit(db, req, "call_order.setup", "call_order", c.id, { popStart, popEnd, funded, eac, overUnder, pm, completedSetup: nowComplete });
-}));
-
 /** "Call 13" + [Call 13.1, Call 13.2] -> "Call 13.3"; "Call 17" + [Call 17] -> "Call 17.1". */
 function nextPeriodId(base: number, existingIds: string[]): string {
   const suffixes = existingIds.map((id) => {
@@ -233,7 +189,7 @@ function nextPeriodId(base: number, existingIds: string[]): string {
 }
 
 // Adds a new funded period (e.g. an option year) under the same call order group.
-app.post("/api/call-orders/:groupKey/periods", authenticateRequest, requirePm, mutation(async (db, req, res) => {
+app.post("/api/call-orders/:groupKey/periods", authenticateRequest, requireProgramManager, mutation(async (db, req, res) => {
   const groupKey = req.params.groupKey as string;
   const { rows: siblings } = await db.query("select * from call_orders where group_key = $1 order by sort_order, created_at", [groupKey]);
   const sibling = siblings[0];
@@ -1201,7 +1157,7 @@ app.put("/api/monthly-reports/:id/sections/:callOrderId", authenticateRequest, r
     { label: "Funds Remaining", value: num(body.remaining) }, { label: "Estimate at Completion", value: num(body.eac) },
     { label: "Over/Under", value: num(body.over) },
   ];
-  const title = `${c.id} — ${c.name}`;
+  const title = `${c.name} (${c.id})`;
   const { rows } = await db.query<{ id: number; existed: boolean }>(
     `insert into msr_sections (monthly_report_id, call_order_id, title, funding, completed, planned, risks, issues, travel, drafted)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,false)

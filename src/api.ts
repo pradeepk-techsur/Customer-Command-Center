@@ -1,13 +1,39 @@
-import type { PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
+import type { CallOrderAwardPreview, CallOrderSetupInput, PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
 
 // Authentication tokens stored in memory and localStorage
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Load tokens from localStorage on initialization
-if (typeof window !== "undefined") {
-  accessToken = localStorage.getItem("accessToken");
-  refreshToken = localStorage.getItem("refreshToken");
+export const SESSION_EXPIRED_EVENT = "portal:session-expired";
+
+function tokenExpiry(token: string | null): number | null {
+  if (!token || typeof window === "undefined") return null;
+  try {
+    const encoded = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(window.atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "="))) as { exp?: number };
+    return payload.exp ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function expireSession() {
+  const hadSession = !!accessToken || !!refreshToken;
+  clearTokens();
+  if (hadSession && typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
+function scheduleTokenRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  const expiresAt = tokenExpiry(accessToken);
+  if (!expiresAt || typeof window === "undefined") return;
+  const delay = Math.max(0, Math.min(expiresAt - Date.now() - 5_000, 2_147_483_647));
+  refreshTimer = setTimeout(async () => {
+    refreshTimer = null;
+    if (!await tryRefreshToken()) expireSession();
+  }, delay);
 }
 
 export function setTokens(access: string, refresh: string) {
@@ -15,9 +41,12 @@ export function setTokens(access: string, refresh: string) {
   refreshToken = refresh;
   localStorage.setItem("accessToken", access);
   localStorage.setItem("refreshToken", refresh);
+  scheduleTokenRefresh();
 }
 
 export function clearTokens() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null;
   accessToken = null;
   refreshToken = null;
   localStorage.removeItem("accessToken");
@@ -37,7 +66,7 @@ let role: Role = "customer";
 let user = "";
 export function setActor(nextRole: Role, nextUser = "") { role = nextRole; user = nextUser; }
 
-async function request(path: string, init: RequestInit = {}): Promise<PortalSnapshot> {
+async function request<T = PortalSnapshot>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers || {});
   
   // Use JWT authentication if token is available
@@ -53,27 +82,27 @@ async function request(path: string, init: RequestInit = {}): Promise<PortalSnap
   
   const res = await fetch(path, { ...init, headers });
   
-  // Handle 401 Unauthorized - try to refresh token
-  if (res.status === 401 && refreshToken) {
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      // Retry original request with new token
+  // Refresh once on an expired access token. If the refresh credential or server session has
+  // expired, notify the app immediately so it cannot keep rendering a stale authenticated UI.
+  if (res.status === 401) {
+    if (refreshToken && await tryRefreshToken()) {
       headers.set("Authorization", `Bearer ${accessToken}`);
       const retryRes = await fetch(path, { ...init, headers });
       const retryBody = await retryRes.json().catch(() => null);
+      if (retryRes.status === 401) {
+        expireSession();
+        throw new Error("Session expired. Please log in again.");
+      }
       if (!retryRes.ok) throw new Error((retryBody && retryBody.error) || `Request failed (${retryRes.status}).`);
-      return retryBody as PortalSnapshot;
-    } else {
-      // Refresh failed - redirect to login
-      clearTokens();
-      window.location.href = "/login";
-      throw new Error("Session expired. Please log in again.");
+      return retryBody as T;
     }
+    expireSession();
+    throw new Error("Session expired. Please log in again.");
   }
   
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new Error((body && body.error) || `Request failed (${res.status}).`);
-  return body as PortalSnapshot;
+  return body as T;
 }
 
 async function tryRefreshToken(): Promise<boolean> {
@@ -92,6 +121,7 @@ async function tryRefreshToken(): Promise<boolean> {
     if (data.accessToken) {
       accessToken = data.accessToken;
       localStorage.setItem("accessToken", data.accessToken);
+      scheduleTokenRefresh();
       return true;
     }
     
@@ -99,6 +129,12 @@ async function tryRefreshToken(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+if (typeof window !== "undefined") {
+  accessToken = localStorage.getItem("accessToken");
+  refreshToken = localStorage.getItem("refreshToken");
+  scheduleTokenRefresh();
 }
 
 const json = (v: unknown) => JSON.stringify(v);
@@ -115,11 +151,20 @@ const scope = (callOrderId: string | null) => enc(callOrderId ?? "bpa");
 
 export const api = {
   snapshot: () => request("/api/portal"),
-  uploadCallOrders: (list: FileList) => request("/api/call-orders/upload", { method: "POST", body: files(list) }),
+  previewCallOrderAward: (award: File) => {
+    const body = new FormData(); body.append("award", award);
+    return request<CallOrderAwardPreview>("/api/call-orders/award-preview", { method: "POST", body });
+  },
+  createCallOrder: (input: CallOrderSetupInput, award?: File) => {
+    const body = new FormData();
+    body.append("details", JSON.stringify(input));
+    if (award) body.append("award", award);
+    return request<PortalSnapshot>("/api/call-orders", { method: "POST", body });
+  },
   saveSpend: (id: string, spend: string) => request(`/api/call-orders/${enc(id)}/spend`, { method: "PATCH", body: json({ spend }) }),
   saveDescription: (id: string, description: string) => request(`/api/call-orders/${enc(id)}/description`, { method: "PATCH", body: json({ description }) }),
   saveNarrative: (id: string, narrative: string) => request(`/api/call-orders/${enc(id)}/narrative`, { method: "PATCH", body: json({ narrative }) }),
-  saveCallOrderSetup: (id: string, input: { popStart?: string; popEnd?: string; funded?: string; eac?: string; overUnder?: string; pm?: string }) =>
+  saveCallOrderSetup: (id: string, input: CallOrderSetupInput) =>
     request(`/api/call-orders/${enc(id)}/setup`, { method: "PATCH", body: json(input) }),
   addCallOrderPeriod: (groupKey: string, input: { popStart: string; popEnd: string; funded?: string }) =>
     request(`/api/call-orders/${enc(groupKey)}/periods`, { method: "POST", body: json(input) }),

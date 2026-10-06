@@ -21,7 +21,7 @@ export function ActionItemsPanel({ callOrderId, weeklyReportId, actionItems, tod
   return (
     <div>
       {visible.map((a) => (
-        <div key={a.id} className="report-item" style={{ opacity: a.status === "closed" ? 0.6 : 1 }}>
+        <div key={a.id} className="report-item action-item-row" style={{ opacity: a.status === "closed" ? 0.6 : 1 }}>
           <div className="dash">—</div>
           <div style={{ flex: 1 }}>
             {a.name}{a.description ? `: ${a.description}` : ""}

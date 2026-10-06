@@ -3,9 +3,10 @@ import { useState } from "react";
 interface LoginPageProps {
   onLogin: (accessToken: string, refreshToken: string) => void;
   onShowRegister: () => void;
+  message?: string;
 }
 
-export function LoginPage({ onLogin, onShowRegister }: LoginPageProps) {
+export function LoginPage({ onLogin, onShowRegister, message }: LoginPageProps) {
   const [mode] = useState<"password" | "magic-link">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,7 +92,7 @@ export function LoginPage({ onLogin, onShowRegister }: LoginPageProps) {
           Sign in to access your contract information
         </p>
 
-        {error && (
+        {(error || message) && (
           <div style={{
             padding: "12px",
             marginBottom: "20px",
@@ -101,7 +102,7 @@ export function LoginPage({ onLogin, onShowRegister }: LoginPageProps) {
             color: "#c33",
             fontSize: "14px"
           }}>
-            {error}
+            {error || message}
           </div>
         )}
 

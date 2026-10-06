@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CallOrder, PortalSnapshot } from "../../shared/types.ts";
 import { api } from "../api.ts";
-import { filled, periodState, usd } from "../lib/format.ts";
+import { callOrderLabel, filled, periodState, usd } from "../lib/format.ts";
 import { Button, Eyebrow, Field, TextInput } from "./ui.tsx";
 import { groupCallOrders } from "./CallOrdersRegister.tsx";
 import { GeneralTab } from "./GeneralTab.tsx";
@@ -30,9 +30,9 @@ function getTabs(role: string): Tab[] {
   return baseTabs;
 }
 
-export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBack, onTab, onSelectPeriod, onSelectStaff, mutate }: {
-  snapshot: PortalSnapshot; order: CallOrder; tab: Tab; isPm: boolean; userName?: string;
-  onBack: () => void; onTab: (t: Tab) => void; onSelectPeriod: (id: string) => void; onSelectStaff?: (staffId: number) => void; mutate: Mutate;
+export function CallOrderDetail({ snapshot, order: c, tab, isPm, canManageCallOrders, userName, onBack, onEditSetup, onTab, onSelectPeriod, onSelectStaff, mutate }: {
+  snapshot: PortalSnapshot; order: CallOrder; tab: Tab; isPm: boolean; canManageCallOrders: boolean; userName?: string;
+  onBack: () => void; onEditSetup: () => void; onTab: (t: Tab) => void; onSelectPeriod: (id: string) => void; onSelectStaff?: (staffId: number) => void; mutate: Mutate;
 }) {
   const role = snapshot.actor?.role || "customer";
   const TABS = getTabs(role);
@@ -58,14 +58,17 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBac
 
       <div className="detail-head">
         <div>
-          <div className="detail-id">{c.groupKey} · {c.id.replace(/^Call\s+/i, '').split('.')[0]}</div>
-          <h1 style={{ marginBottom: 8 }}>{c.groupName}</h1>
+          <div className="detail-id">Funded period · {c.id}</div>
+          <h1 style={{ marginBottom: 8 }}>{callOrderLabel(c.groupName, c.groupKey)}</h1>
           <div className="page-sub">Period of performance {c.pop} · {periodState(c, today)} period · PM {c.pm}</div>
         </div>
-        <div className="stat-box">
-          <div><Eyebrow>Obligated</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usd(c.funded)}</div></div>
-          <div><Eyebrow>Expended</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usd(c.spend)}</div></div>
-          <div><Eyebrow>People</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{staffCount}</div></div>
+        <div className="detail-actions">
+          {canManageCallOrders && <Button primary onClick={onEditSetup}>{c.pending ? "Complete setup" : "Edit setup"}</Button>}
+          <div className="stat-box">
+            <div><Eyebrow>Obligated</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usd(c.funded)}</div></div>
+            <div><Eyebrow>Expended</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usd(c.spend)}</div></div>
+            <div><Eyebrow>People</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{staffCount}</div></div>
+          </div>
         </div>
       </div>
 
@@ -75,17 +78,17 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, userName, onBac
           <div className="period-chips" style={{ marginTop: 8 }}>
             {group.periods.map((p) => (
               <button key={p.id} type="button" className={"period-chip" + (p.id === c.id ? " active" : "")} onClick={() => onSelectPeriod(p.id)}>
-                <div className="l">{p.id}</div>
+                <div className="l">{callOrderLabel(p.name, p.id)}</div>
                 <div className="s">{periodState(p, today)} · {p.pop}</div>
               </button>
             ))}
-            {isPm && !showAddPeriod && (
+            {canManageCallOrders && !showAddPeriod && (
               <button type="button" className="period-chip" onClick={() => setShowAddPeriod(true)}>
                 <div className="l">+ Add period</div>
               </button>
             )}
           </div>
-          {isPm && showAddPeriod && (
+          {canManageCallOrders && showAddPeriod && (
             <div className="add-row" style={{ marginTop: 10 }}>
               <Field label="Period start"><input type="date" className="input" value={periodForm.popStart} onChange={(e) => setPeriodForm({ ...periodForm, popStart: e.target.value })} /></Field>
               <Field label="Period end"><input type="date" className="input" value={periodForm.popEnd} onChange={(e) => setPeriodForm({ ...periodForm, popEnd: e.target.value })} /></Field>

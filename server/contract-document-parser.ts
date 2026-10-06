@@ -30,7 +30,7 @@ function toAmount(raw: string | null | undefined): number | null {
 }
 
 /** Extracts plain text from a PDF or DOCX buffer. Returns "" for unsupported types. */
-async function extractText(buffer: Buffer, mimetype: string): Promise<string> {
+export async function extractText(buffer: Buffer, mimetype: string): Promise<string> {
   if (mimetype === "application/pdf") {
     const { text } = await pdfParse(buffer);
     return text;

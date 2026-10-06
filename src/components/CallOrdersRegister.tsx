@@ -1,7 +1,7 @@
 import type { CallOrder, PortalSnapshot } from "../../shared/types.ts";
 import { useSort } from "../hooks/useSort.ts";
-import { burnColor, dateLabel, filled, isVacant, localDate, mostOverdueStamp, pctOf, periodState, usd, usdFull } from "../lib/format.ts";
-import { Eyebrow, FileButton, SortHeaders } from "./ui.tsx";
+import { burnColor, callOrderLabel, dateLabel, filled, isVacant, localDate, mostOverdueStamp, pctOf, periodState, usd, usdFull } from "../lib/format.ts";
+import { Button, Eyebrow, SortHeaders } from "./ui.tsx";
 import type { Tab } from "./CallOrderDetail.tsx";
 
 export interface Group { key: string; name: string; periods: CallOrder[]; current: CallOrder }
@@ -28,8 +28,8 @@ const COLS = [
   { key: "spend", label: "Actual spend", align: "right" as const }, { key: "updated", label: "Last updated", align: "right" as const },
 ];
 
-export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, onUpload }: {
-  snapshot: PortalSnapshot; isPm: boolean; onOpen: (id: string, tab: Tab) => void; onBackToDashboard: () => void; onUpload: (files: FileList) => void;
+export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, onAddCallOrder }: {
+  snapshot: PortalSnapshot; isPm: boolean; onOpen: (id: string, tab: Tab) => void; onBackToDashboard: () => void; onAddCallOrder: () => void;
 }) {
   const { callOrders: all, today, config } = snapshot;
   const groups = groupCallOrders(all, today);
@@ -57,9 +57,9 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, 
         </div>
         <div className="totals">
           {isPm && (
-            <FileButton className="btn outline" onFiles={onUpload}>
-              <span className="plus">+</span><span>Upload call order</span>
-            </FileButton>
+            <Button onClick={onAddCallOrder}>
+              <span className="plus">+</span><span>Add call order</span>
+            </Button>
           )}
           <div><Eyebrow>Obligated</Eyebrow><div className="total-value num" style={{ marginTop: 4 }}>{usd(totalFunded)}</div></div>
           <div><Eyebrow>Expended</Eyebrow><div className="total-value num" style={{ marginTop: 4 }}>{usd(totalSpend)}</div></div>
@@ -72,14 +72,13 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, 
           const c = g.current;
           const pct = pctOf(c.spend, c.funded);
           const stamp = mostOverdueStamp(c, today, config);
-          const callNum = c.id.replace(/^Call\s+/i, '').split('.')[0];
-          const idLine = c.pending ? `${g.key} · pending setup`
-            : g.periods.length > 1 ? `${g.key} · ${callNum} · ${g.periods.length} periods` : `${g.key} · ${callNum}`;
+          const idLine = c.pending ? "Pending setup"
+            : g.periods.length > 1 ? `${g.periods.length} funded periods` : "1 funded period";
           const burning = c.funded > 0 && c.spend > 0;
           return (
             <div key={g.key} className="grid trow clickable register-cols" onClick={() => onOpen(c.id, "General")}>
               <div>
-                <div className="register-name">{g.name}</div>
+                <div className="register-name">{callOrderLabel(g.name, g.key)}</div>
                 <div className="register-id">{idLine}</div>
               </div>
               <div className="num" style={{ color: "var(--ink-3)" }}>{c.pop}</div>

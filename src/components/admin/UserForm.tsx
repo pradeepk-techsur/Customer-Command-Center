@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { callOrderLabel } from "../../lib/format.ts";
 
 interface User {
   id?: number;
@@ -389,7 +390,7 @@ export function UserForm({ user, onSave, onCancel, isProgramManager = false }: U
                           style={{ marginRight: "8px" }}
                         />
                         <span>
-                          {co.name} <span style={{ color: "var(--muted)" }}>({co.group_name})</span>
+                          {callOrderLabel(co.name, co.id)}
                         </span>
                       </label>
                     ))

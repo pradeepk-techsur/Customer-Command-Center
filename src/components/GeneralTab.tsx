@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CallOrder } from "../../shared/types.ts";
 import { api } from "../api.ts";
-import { localDate, periodState } from "../lib/format.ts";
+import { callOrderLabel, localDate, periodState } from "../lib/format.ts";
 import { TextArea } from "./ui.tsx";
 import type { Group } from "./CallOrdersRegister.tsx";
 import type { Mutate } from "../App.tsx";
@@ -35,7 +35,7 @@ export function GeneralTab({ order: c, group, today, isPm, mutate }: {
           const soon = isCurrent && endingSoon(p, today);
           return (
             <div key={p.id} className="fin-row">
-              <div style={{ color: "var(--ink-3)" }}>{p.id} · {p.pop}</div>
+              <div style={{ color: "var(--ink-3)" }}>{callOrderLabel(p.name, p.id)} · {p.pop}</div>
               <div className="v">
                 {isCurrent && <span style={soon ? { color: "var(--burn-high)", fontWeight: 600 } : undefined}>Current</span>}
               </div>

@@ -31,25 +31,6 @@ export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: Cal
     mutate(() => api.saveSpend(c.id, numericValue));
   };
 
-  // Pending call orders (freshly uploaded, no data yet) open the setup form by default.
-  const [editingSetup, setEditingSetup] = useState(c.pending);
-  const [setupForm, setSetupForm] = useState({
-    popStart: c.popStart ?? "", popEnd: c.popEnd ?? "",
-    funded: c.funded ? String(c.funded) : "", eac: c.eac !== null ? String(c.eac) : "",
-    overUnder: c.over !== null ? String(c.over) : "", pm: c.pm === "Unassigned" ? "" : c.pm,
-  });
-  useEffect(() => {
-    setEditingSetup(c.pending);
-    setSetupForm({
-      popStart: c.popStart ?? "", popEnd: c.popEnd ?? "",
-      funded: c.funded ? String(c.funded) : "", eac: c.eac !== null ? String(c.eac) : "",
-      overUnder: c.over !== null ? String(c.over) : "", pm: c.pm === "Unassigned" ? "" : c.pm,
-    });
-  }, [c.id]);
-  const saveSetup = () => {
-    mutate(() => api.saveCallOrderSetup(c.id, setupForm)).then(() => setEditingSetup(false));
-  };
-
   const [showLcatForm, setShowLcatForm] = useState(false);
   const [lcatForm, setLcatForm] = useState(emptyLcatForm);
   const addLcat = () => {
@@ -82,47 +63,23 @@ export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: Cal
       <div className="card">
         <div className="card-head">
           <div>Funding summary</div>
-          {isPm && !editingSetup && <Button onClick={() => setEditingSetup(true)}>Edit setup</Button>}
           {!isPm && <div className={"stamp" + (stale ? " stale" : "")}>Financials updated {dateLabel(c.finUpdatedOn)}</div>}
         </div>
-        {isPm && editingSetup ? (
-          <div className="add-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
-            <div className="two-col">
-              <Field label="Period start"><input type="date" className="input" value={setupForm.popStart} onChange={(e) => setSetupForm({ ...setupForm, popStart: e.target.value })} /></Field>
-              <Field label="Period end"><input type="date" className="input" value={setupForm.popEnd} onChange={(e) => setSetupForm({ ...setupForm, popEnd: e.target.value })} /></Field>
-            </div>
-            <div className="two-col">
-              <Field label="Funds obligated"><TextInput value={setupForm.funded} onChange={(v) => setSetupForm({ ...setupForm, funded: v })} placeholder="$0" /></Field>
-              <Field label="Project manager"><TextInput value={setupForm.pm} onChange={(v) => setSetupForm({ ...setupForm, pm: v })} placeholder="Unassigned" /></Field>
-            </div>
-            <div className="two-col">
-              <Field label="Estimate at completion"><TextInput value={setupForm.eac} onChange={(v) => setSetupForm({ ...setupForm, eac: v })} placeholder="$0" /></Field>
-              <Field label="Over / under"><TextInput value={setupForm.overUnder} onChange={(v) => setSetupForm({ ...setupForm, overUnder: v })} placeholder="$0" /></Field>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <Button primary onClick={saveSetup}>{c.pending ? "Complete call order setup" : "Save"}</Button>
-              {!c.pending && <Button onClick={() => setEditingSetup(false)}>Cancel</Button>}
-            </div>
+        {isPm && (
+          <div className="fin-edit">
+            <Field label="Update funds expended to date" style={{ flex: 1 }}>
+              <TextInput value={draft} onChange={handleSpendChange} placeholder="$0" />
+            </Field>
+            <Button primary onClick={saveDraft}>Save</Button>
           </div>
-        ) : (
-          <>
-            {isPm && (
-              <div className="fin-edit">
-                <Field label="Update funds expended to date" style={{ flex: 1 }}>
-                  <TextInput value={draft} onChange={handleSpendChange} placeholder="$0" />
-                </Field>
-                <Button primary onClick={saveDraft}>Save</Button>
-              </div>
-            )}
-            {funding.map((r) => (
-              <div key={r.label} className="fin-row">
-                <div style={{ color: "var(--ink-3)" }}>{r.label}</div>
-                <div className="v num" style={r.color ? { color: r.color, fontWeight: 600 } : undefined}>{r.value}</div>
-              </div>
-            ))}
-            <div className="footnote">* Expenditures lag one invoice cycle</div>
-          </>
         )}
+        {funding.map((r) => (
+          <div key={r.label} className="fin-row">
+            <div style={{ color: "var(--ink-3)" }}>{r.label}</div>
+            <div className="v num" style={r.color ? { color: r.color, fontWeight: 600 } : undefined}>{r.value}</div>
+          </div>
+        ))}
+        <div className="footnote">* Expenditures lag one invoice cycle</div>
       </div>
 
       <div className="card">

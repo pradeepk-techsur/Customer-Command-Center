@@ -1,10 +1,10 @@
 import type { PortalSnapshot } from "../../shared/types.ts";
-import { filled, usdFull } from "../lib/format.ts";
-import { Eyebrow } from "./ui.tsx";
+import { callOrderLabel, filled, usdFull } from "../lib/format.ts";
+import { Button, Eyebrow } from "./ui.tsx";
 import { groupCallOrders } from "./CallOrdersRegister.tsx";
 
-export function ContractDetailPage({ snapshot, onSelectCallOrder }: {
-  snapshot: PortalSnapshot; onSelectCallOrder: (id: string) => void;
+export function ContractDetailPage({ snapshot, canManageCallOrders, onAddCallOrder, onSelectCallOrder }: {
+  snapshot: PortalSnapshot; canManageCallOrders: boolean; onAddCallOrder: () => void; onSelectCallOrder: (id: string) => void;
 }) {
   const { contract, today } = snapshot;
   // One row per call order family (option periods live as tabs on the detail page, not separate rows here).
@@ -29,12 +29,13 @@ export function ContractDetailPage({ snapshot, onSelectCallOrder }: {
         <div className="card" style={{ gridColumn: "1 / -1" }}>
           <div className="card-head wide">
             <div>Call orders</div>
+            {canManageCallOrders && <Button primary onClick={onAddCallOrder}>+ Add call order</Button>}
           </div>
           {groups.map((g) => {
             const c = g.current;
             return (
               <button key={g.key} type="button" className="fin-row" style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: 0, borderBottom: "1px solid var(--line-soft)" }} onClick={() => onSelectCallOrder(c.id)}>
-                <div style={{ color: "var(--ink-2)" }}>{g.name}<div style={{ color: "var(--ink-3)", fontSize: 11 }}>{filled(c)} people · {usdFull(c.funded)} funded</div></div>
+                <div style={{ color: "var(--ink-2)" }}>{callOrderLabel(g.name, g.key)}<div style={{ color: "var(--ink-3)", fontSize: 11 }}>{filled(c)} people · {usdFull(c.funded)} funded</div></div>
                 <div className="v num">{usdFull(c.spend)}</div>
               </button>
             );
