@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CallOrder, PortalSnapshot } from "../../shared/types.ts";
 import { api } from "../api.ts";
-import { callOrderLabel, filled, periodState, usd } from "../lib/format.ts";
+import { callOrderLabel, filled, normalizeCallOrderId, periodState, usd } from "../lib/format.ts";
 import { Button, Eyebrow, Field, TextInput } from "./ui.tsx";
 import { groupCallOrders } from "./CallOrdersRegister.tsx";
 import { GeneralTab } from "./GeneralTab.tsx";
@@ -41,13 +41,19 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, canManageCallOr
   const staffCount = c.staff.length ? filled(c) : "—";
 
   const [showAddPeriod, setShowAddPeriod] = useState(false);
-  const [periodForm, setPeriodForm] = useState({ popStart: "", popEnd: "", funded: "" });
+  const [periodForm, setPeriodForm] = useState({ callOrderId: "", popStart: "", popEnd: "", funded: "" });
+  const [periodError, setPeriodError] = useState("");
   const addPeriod = () => {
-    if (!periodForm.popStart || !periodForm.popEnd) return;
+    const enteredId = normalizeCallOrderId(periodForm.callOrderId);
+    if (!enteredId) { setPeriodError("Enter a valid call-order ID, such as Call 13.1."); return; }
+    if (!periodForm.popStart || !periodForm.popEnd) { setPeriodError("Enter the complete period of performance."); return; }
+    if (periodForm.popEnd < periodForm.popStart) { setPeriodError("Period end must be on or after the start date."); return; }
+    setPeriodError("");
     mutate(() => api.addCallOrderPeriod(c.groupKey, periodForm)).then((snap) => {
+      if (!snap) return;
       setShowAddPeriod(false);
-      setPeriodForm({ popStart: "", popEnd: "", funded: "" });
-      const created = snap?.callOrders.filter((o) => o.groupKey === c.groupKey).slice(-1)[0];
+      setPeriodForm({ callOrderId: "", popStart: "", popEnd: "", funded: "" });
+      const created = snap.callOrders.find((o) => o.id === enteredId);
       if (created) onSelectPeriod(created.id);
     });
   };
@@ -83,18 +89,22 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, canManageCallOr
               </button>
             ))}
             {canManageCallOrders && !showAddPeriod && (
-              <button type="button" className="period-chip" onClick={() => setShowAddPeriod(true)}>
+              <button type="button" className="period-chip" onClick={() => { setPeriodError(""); setShowAddPeriod(true); }}>
                 <div className="l">+ Add period</div>
               </button>
             )}
           </div>
           {canManageCallOrders && showAddPeriod && (
-            <div className="add-row" style={{ marginTop: 10 }}>
-              <Field label="Period start"><input type="date" className="input" value={periodForm.popStart} onChange={(e) => setPeriodForm({ ...periodForm, popStart: e.target.value })} /></Field>
-              <Field label="Period end"><input type="date" className="input" value={periodForm.popEnd} onChange={(e) => setPeriodForm({ ...periodForm, popEnd: e.target.value })} /></Field>
-              <Field label="Funded amount"><TextInput value={periodForm.funded} onChange={(v) => setPeriodForm({ ...periodForm, funded: v })} placeholder="$0" /></Field>
-              <Button primary onClick={addPeriod}>Save period</Button>
-              <Button onClick={() => setShowAddPeriod(false)}>Cancel</Button>
+            <div style={{ marginTop: 10 }}>
+              {periodError && <div className="setup-error" style={{ marginBottom: 0 }}>{periodError}</div>}
+              <div className="add-row" style={{ flexWrap: "wrap" }}>
+                <Field label="Call-order ID"><TextInput value={periodForm.callOrderId} onChange={(v) => setPeriodForm({ ...periodForm, callOrderId: v })} placeholder="Call 13.1" /></Field>
+                <Field label="Period start"><input type="date" className="input" value={periodForm.popStart} onChange={(e) => setPeriodForm({ ...periodForm, popStart: e.target.value })} /></Field>
+                <Field label="Period end"><input type="date" className="input" value={periodForm.popEnd} onChange={(e) => setPeriodForm({ ...periodForm, popEnd: e.target.value })} /></Field>
+                <Field label="Funded amount"><TextInput value={periodForm.funded} onChange={(v) => setPeriodForm({ ...periodForm, funded: v })} placeholder="$0" /></Field>
+                <Button primary onClick={addPeriod}>Save period</Button>
+                <Button onClick={() => { setPeriodError(""); setShowAddPeriod(false); }}>Cancel</Button>
+              </div>
             </div>
           )}
         </div>

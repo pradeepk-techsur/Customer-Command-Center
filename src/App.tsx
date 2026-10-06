@@ -14,6 +14,7 @@ import { AdminPage } from "./components/admin/AdminPage.tsx";
 import { ChangePasswordModal } from "./components/ChangePasswordModal.tsx";
 import { CallOrderSetupPage } from "./components/CallOrderSetupPage.tsx";
 import { ToastContainer, ConfirmDialog } from "./components/ui.tsx";
+import { normalizeCallOrderId } from "./lib/format.ts";
 
 /** Runs a mutation against the API and replaces the snapshot with the server's response. */
 export type Mutate = (fn: () => Promise<PortalSnapshot>) => Promise<PortalSnapshot | undefined>;
@@ -273,11 +274,9 @@ export default function App() {
               ? api.createCallOrder(input, award)
               : api.saveCallOrderSetup(setupTarget, input));
             if (!next) return false;
-            if (setupTarget === "create") {
-              const number = Number(input.callNumber?.match(/\d+/)?.[0]);
-              const created = next.callOrders.find((c) => c.id === `Call ${number}`);
-              if (created) { setSelected(created.id); setTab("General"); }
-            }
+            const savedId = normalizeCallOrderId(input.callNumber);
+            const saved = next.callOrders.find((c) => c.id === savedId);
+            if (saved) { setSelected(saved.id); setTab("General"); }
             setSetupTarget(null);
             return true;
           }}

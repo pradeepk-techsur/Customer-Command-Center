@@ -12,6 +12,7 @@ import { uploadsDir } from "../uploads.ts";
 import { parseCallOrderAward } from "../call-order-award-parser.ts";
 import { validateCallOrderSetup } from "../call-order-setup.ts";
 import type { CallOrderSetupInput } from "../../shared/types.ts";
+import type { Db } from "../route-helpers.ts";
 
 const router = express.Router();
 const awardUpload = multer({
@@ -22,6 +23,55 @@ const acceptedTypes = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
+
+const quoteIdentifier = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+async function migrateCallOrderId(db: Db, oldId: string, newId: string): Promise<void> {
+  if (oldId === newId) return;
+  const duplicate = await db.query("select 1 from call_orders where id = $1", [newId]);
+  if (duplicate.rows[0]) {
+    const error = new Error("That call-order ID already exists.") as Error & { status?: number };
+    error.status = 409;
+    throw error;
+  }
+
+  await db.query(
+    `insert into call_orders
+      (id, group_key, group_name, name, pop_label, pop_start, pop_end, funded, spend, eac, over_under,
+       pm, pending, highlights, fin_updated_on, people_updated_on, sort_order, created_at, description, narrative)
+     select $2, group_key, group_name, name, pop_label, pop_start, pop_end, funded, spend, eac, over_under,
+       pm, pending, highlights, fin_updated_on, people_updated_on, sort_order, created_at, description, narrative
+     from call_orders where id = $1`,
+    [oldId, newId],
+  );
+
+  const references = await db.query<{ table_schema: string; table_name: string; column_name: string }>(
+    `select distinct kcu.table_schema, kcu.table_name, kcu.column_name
+       from information_schema.table_constraints tc
+       join information_schema.key_column_usage kcu
+         on kcu.constraint_catalog = tc.constraint_catalog
+        and kcu.constraint_schema = tc.constraint_schema
+        and kcu.constraint_name = tc.constraint_name
+       join information_schema.constraint_column_usage ccu
+         on ccu.constraint_catalog = tc.constraint_catalog
+        and ccu.constraint_schema = tc.constraint_schema
+        and ccu.constraint_name = tc.constraint_name
+      where tc.constraint_type = 'FOREIGN KEY'
+        and ccu.table_schema = current_schema()
+        and ccu.table_name = 'call_orders'
+        and ccu.column_name = 'id'`,
+  );
+  for (const reference of references.rows) {
+    await db.query(
+      `update ${quoteIdentifier(reference.table_schema)}.${quoteIdentifier(reference.table_name)}
+          set ${quoteIdentifier(reference.column_name)} = $2
+        where ${quoteIdentifier(reference.column_name)} = $1`,
+      [oldId, newId],
+    );
+  }
+  await db.query("update audit_log set entity_id = $2 where entity = 'call_order' and entity_id = $1", [oldId, newId]);
+  await db.query("delete from call_orders where id = $1", [oldId]);
+}
 
 function awardFile(req: express.Request, res: express.Response): Express.Multer.File | null | undefined {
   const file = req.file as Express.Multer.File | undefined;
@@ -151,6 +201,7 @@ router.patch("/:id/setup", authenticateRequest, requireProgramManager, mutation(
   }
 
   const checked = validateCallOrderSetup({
+    callNumber: req.body?.callNumber ?? current.id,
     name: req.body?.name ?? current.name,
     description: req.body?.description ?? current.description,
     narrative: req.body?.narrative ?? current.narrative,
@@ -161,26 +212,34 @@ router.patch("/:id/setup", authenticateRequest, requireProgramManager, mutation(
     eac: req.body?.eac ?? (current.eac === null ? "" : String(current.eac)),
     overUnder: req.body?.overUnder ?? (current.over_under === null ? "" : String(current.over_under)),
     pm: req.body?.pm ?? current.pm,
-  }, false);
+  }, true);
   if (!checked.value) {
     res.status(400).json({ error: Object.values(checked.errors)[0] || "Review the call-order details.", fields: checked.errors });
     return false;
   }
   const setup = checked.value;
+  if (setup.groupKey !== current.group_key) {
+    res.status(400).json({ error: `The funded-period ID must remain within ${current.group_key}.` });
+    return false;
+  }
   const changedFinancialFields = ["funded", "spend", "eac", "over_under", "pop_start", "pop_end", "pm"];
   await captureCallOrderSnapshot(db, current.id, req.user?.id ?? null, "Call order setup updated", changedFinancialFields);
   await db.query(
     `update call_orders set group_name = $2, name = $2, description = $3, narrative = $4 where group_key = $1`,
     [current.group_key, setup.name, setup.description, setup.narrative],
   );
+  await migrateCallOrderId(db, current.id, setup.id!);
+  const targetId = setup.id!;
   await db.query(
     `update call_orders set pop_label = $2, pop_start = $3, pop_end = $4, funded = $5, spend = $6,
        eac = $7, over_under = $8, pm = $9, pending = false, fin_updated_on = current_date where id = $1`,
-    [current.id, formatPop(setup.popStart, setup.popEnd), setup.popStart, setup.popEnd, setup.funded,
+    [targetId, formatPop(setup.popStart, setup.popEnd), setup.popStart, setup.popEnd, setup.funded,
       setup.spend, setup.eac, setup.overUnder, setup.pm],
   );
-  await audit(db, req, "call_order.setup", "call_order", current.id, {
+  await db.query("update msr_sections set title = $2 where call_order_id = $1", [targetId, `${setup.name} (${targetId})`]);
+  await audit(db, req, "call_order.setup", "call_order", targetId, {
     groupKey: current.group_key,
+    idChangedFrom: current.id === targetId ? null : current.id,
     from: {
       name: current.name, description: current.description, narrative: current.narrative,
       popStart: current.pop_start, popEnd: current.pop_end, funded: current.funded, spend: current.spend,

@@ -25,6 +25,7 @@ import staffingRouter from "./routes/staffing.ts";
 import actionItemsRouter, { archiveRouter as actionItemsArchiveRouter } from "./routes/action-items.ts";
 import approvedUsersRouter from "./routes/approved-users.ts";
 import callOrdersRouter from "./routes/call-orders.ts";
+import { normalizeCallNumber } from "./call-order-setup.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -179,15 +180,6 @@ app.patch("/api/call-orders/:id/narrative", authenticateRequest, requirePm, requ
   await audit(db, req, "call_order.narrative", "call_order", c.id, { groupKey: c.group_key, from: c.narrative, to: narrative });
 }));
 
-/** "Call 13" + [Call 13.1, Call 13.2] -> "Call 13.3"; "Call 17" + [Call 17] -> "Call 17.1". */
-function nextPeriodId(base: number, existingIds: string[]): string {
-  const suffixes = existingIds.map((id) => {
-    const m = String(id).match(/\.(\d+)$/);
-    return m ? +m[1] : 0;
-  });
-  return `Call ${base}.${Math.max(...suffixes, 0) + 1}`;
-}
-
 // Adds a new funded period (e.g. an option year) under the same call order group.
 app.post("/api/call-orders/:groupKey/periods", authenticateRequest, requireProgramManager, mutation(async (db, req, res) => {
   const groupKey = req.params.groupKey as string;
@@ -200,9 +192,13 @@ app.post("/api/call-orders/:groupKey/periods", authenticateRequest, requireProgr
   if (!popStart || !popEnd) { res.status(400).json({ error: "Period start and end dates are required." }); return false; }
   if (popEnd < popStart) { res.status(400).json({ error: "Period of performance end date must be after the start date." }); return false; }
   const funded = num(req.body?.funded) ?? 0;
-
-  const base = +(String(groupKey).match(/(\d+)/)?.[1] ?? "0");
-  const newId = nextPeriodId(base, siblings.map((s) => s.id));
+  if (funded < 0) { res.status(400).json({ error: "Funded amount must be a non-negative amount." }); return false; }
+  const enteredId = normalizeCallNumber(req.body?.callOrderId);
+  if (!enteredId) { res.status(400).json({ error: "Enter a call-order ID such as Call 13.1." }); return false; }
+  if (enteredId.groupKey !== groupKey) { res.status(400).json({ error: `The funded-period ID must remain within ${groupKey}.` }); return false; }
+  const duplicate = await db.query("select 1 from call_orders where id = $1", [enteredId.id]);
+  if (duplicate.rows[0]) { res.status(409).json({ error: "That call-order ID already exists." }); return false; }
+  const newId = enteredId.id;
 
   await db.query(
     `insert into call_orders (id, group_key, group_name, name, description, narrative, pop_label, pop_start, pop_end, funded, spend, pm, pending, highlights, sort_order)

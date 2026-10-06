@@ -5,7 +5,8 @@ import { normalizeCallNumber, validateCallOrderSetup } from "./call-order-setup.
 test("normalizes an entered call number to period and group identifiers", () => {
   assert.deepEqual(normalizeCallNumber("020"), { id: "Call 20", groupKey: "Call 020" });
   assert.deepEqual(normalizeCallNumber("Call 7"), { id: "Call 7", groupKey: "Call 007" });
-  assert.equal(normalizeCallNumber("7.1"), null);
+  assert.deepEqual(normalizeCallNumber("007.02"), { id: "Call 7.2", groupKey: "Call 007" });
+  assert.equal(normalizeCallNumber("7.0"), null);
 });
 
 test("validates and normalizes a complete setup", () => {

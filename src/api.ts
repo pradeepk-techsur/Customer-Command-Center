@@ -166,7 +166,7 @@ export const api = {
   saveNarrative: (id: string, narrative: string) => request(`/api/call-orders/${enc(id)}/narrative`, { method: "PATCH", body: json({ narrative }) }),
   saveCallOrderSetup: (id: string, input: CallOrderSetupInput) =>
     request(`/api/call-orders/${enc(id)}/setup`, { method: "PATCH", body: json(input) }),
-  addCallOrderPeriod: (groupKey: string, input: { popStart: string; popEnd: string; funded?: string }) =>
+  addCallOrderPeriod: (groupKey: string, input: { callOrderId: string; popStart: string; popEnd: string; funded?: string }) =>
     request(`/api/call-orders/${enc(groupKey)}/periods`, { method: "POST", body: json(input) }),
   addStaff: (id: string, input: { name: string; laborCategory: string; rate: string }) =>
     request(`/api/call-orders/${enc(id)}/staff`, { method: "POST", body: json(input) }),

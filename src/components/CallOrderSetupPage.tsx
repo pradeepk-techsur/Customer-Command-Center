@@ -19,6 +19,7 @@ const blankSetup: CallOrderSetupInput = {
 
 function setupFromOrder(order: CallOrder): CallOrderSetupInput {
   return {
+    callNumber: order.id,
     name: order.name,
     description: order.description,
     narrative: order.narrative,
@@ -66,7 +67,7 @@ export function CallOrderSetupPage({ mode, order, onCancel, onSubmit }: {
   };
 
   const submit = async () => {
-    if (mode === "create" && !form.callNumber?.trim()) { setError("Enter the internal call-order number."); return; }
+    if (!form.callNumber?.trim()) { setError("Enter the call-order ID."); return; }
     if (!form.name.trim()) { setError("Enter the call-order name."); return; }
     if (!form.popStart || !form.popEnd) { setError("Enter the complete period of performance."); return; }
     if (form.popEnd < form.popStart) { setError("Period end must be on or after the start date."); return; }
@@ -112,7 +113,7 @@ export function CallOrderSetupPage({ mode, order, onCancel, onSubmit }: {
         <div>
           <div className="detail-id">{mode === "create" ? "Review and submit" : `${order?.id} · Setup`}</div>
           <h1>{mode === "create" ? "New call order" : "Edit call-order setup"}</h1>
-          <div className="page-sub">{mode === "create" ? "Confirm the award-derived values and complete any missing fields." : "The internal call-order number cannot be changed."}</div>
+          <div className="page-sub">{mode === "create" ? "Confirm the award-derived values and complete any missing fields." : `The ID may be corrected within ${order?.groupKey}. Related records will move with it.`}</div>
         </div>
       </div>
 
@@ -128,11 +129,7 @@ export function CallOrderSetupPage({ mode, order, onCancel, onSubmit }: {
         <div className="form-head">Identity and ownership</div>
         <div className="form-body">
           <div className="two-col">
-            {mode === "create" ? (
-              <Field label="Internal call-order number"><TextInput value={form.callNumber ?? ""} onChange={(v) => change("callNumber", v)} placeholder="20" /></Field>
-            ) : (
-              <Field label="Internal call-order number"><TextInput value={order?.id ?? ""} onChange={() => undefined} disabled /></Field>
-            )}
+            <Field label="Call-order ID"><TextInput value={form.callNumber ?? ""} onChange={(v) => change("callNumber", v)} placeholder={mode === "create" ? "Call 20" : "Call 13.1"} /></Field>
             <Field label="Project Manager"><TextInput value={form.pm} onChange={(v) => change("pm", v)} placeholder="Unassigned" /></Field>
           </div>
           <Field label="Call-order name"><TextInput value={form.name} onChange={(v) => change("name", v)} placeholder="Enterprise Architecture Support" /></Field>

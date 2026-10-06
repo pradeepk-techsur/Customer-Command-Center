@@ -21,6 +21,15 @@ export function callOrderLabel(name: string, number?: string | null): string {
   return number ? `${name} (${number})` : name;
 }
 
+export function normalizeCallOrderId(value: string | null | undefined): string | null {
+  const match = String(value ?? "").trim().match(/^(?:Call\s*)?0*(\d+)(?:\.0*(\d+))?$/i);
+  if (!match) return null;
+  const number = Number(match[1]);
+  const period = match[2] === undefined ? null : Number(match[2]);
+  if (!Number.isSafeInteger(number) || number < 1 || (period !== null && (!Number.isSafeInteger(period) || period < 1))) return null;
+  return `Call ${number}${period === null ? "" : `.${period}`}`;
+}
+
 export const isVacant = (name: string) => /^VACANT/i.test(name);
 export const isDeparted = (status: string) => /offboarded|no longer available/i.test(status || "");
 export const isAssigned = (s: StaffMember) => !isVacant(s.name) && !isDeparted(s.status);

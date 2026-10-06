@@ -29,11 +29,15 @@ function money(value: unknown, fallback: number | null): number | null {
 }
 
 export function normalizeCallNumber(value: unknown): { id: string; groupKey: string } | null {
-  const match = String(value ?? "").trim().match(/^(?:Call\s*)?0*(\d+)$/i);
+  const match = String(value ?? "").trim().match(/^(?:Call\s*)?0*(\d+)(?:\.0*(\d+))?$/i);
   if (!match) return null;
   const number = Number(match[1]);
-  if (!Number.isSafeInteger(number) || number < 1) return null;
-  return { id: `Call ${number}`, groupKey: `Call ${String(number).padStart(3, "0")}` };
+  const period = match[2] === undefined ? null : Number(match[2]);
+  if (!Number.isSafeInteger(number) || number < 1 || (period !== null && (!Number.isSafeInteger(period) || period < 1))) return null;
+  return {
+    id: `Call ${number}${period === null ? "" : `.${period}`}`,
+    groupKey: `Call ${String(number).padStart(3, "0")}`,
+  };
 }
 
 export function validateCallOrderSetup(
@@ -50,7 +54,7 @@ export function validateCallOrderSetup(
   const eac = money(input.eac, null);
   const overUnder = money(input.overUnder, null);
 
-  if (requireCallNumber && !callNumber) errors.callNumber = "Enter a positive whole call-order number.";
+  if (requireCallNumber && !callNumber) errors.callNumber = "Enter a call-order ID such as Call 13 or Call 13.1.";
   if (!name) errors.name = "Call-order name is required.";
   if (!validIsoDate(popStart)) errors.popStart = "Enter a valid period start date.";
   if (!validIsoDate(popEnd)) errors.popEnd = "Enter a valid period end date.";
