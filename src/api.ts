@@ -1,4 +1,4 @@
-import type { CallOrderAwardPreview, CallOrderSetupInput, PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
+import type { CallOrderAwardPreview, CallOrderSetupInput, InvoiceCreateInput, InvoicePreview, PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
 
 // Authentication tokens stored in memory and localStorage
 let accessToken: string | null = null;
@@ -186,8 +186,16 @@ export const api = {
     request(`/api/scope/${scope(callOrderId)}/clins/${clinId}/monthly-spend/${month}`, { method: "PUT", body: json(input) }),
 
   // Invoices
-  addInvoice: (callOrderId: string | null, input: FormData) =>
-    request(`/api/scope/${scope(callOrderId)}/invoices`, { method: "POST", body: input }),
+  previewInvoice: (callOrderId: string | null, file: File) => {
+    const body = new FormData(); body.append("file", file);
+    return request<InvoicePreview>(`/api/scope/${scope(callOrderId)}/invoices/preview`, { method: "POST", body });
+  },
+  addInvoice: (callOrderId: string | null, input: InvoiceCreateInput, file?: File) => {
+    const body = new FormData();
+    body.append("details", JSON.stringify(input));
+    if (file) body.append("file", file);
+    return request<PortalSnapshot>(`/api/scope/${scope(callOrderId)}/invoices`, { method: "POST", body });
+  },
   updateInvoice: (callOrderId: string | null, invoiceId: number, input: { paymentStatus?: string; paidDate?: string }) =>
     request(`/api/scope/${scope(callOrderId)}/invoices/${invoiceId}`, { method: "PATCH", body: json(input) }),
   removeInvoice: (callOrderId: string | null, invoiceId: number) =>

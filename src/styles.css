@@ -285,13 +285,26 @@ h1 { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spac
 .setup-file { margin-bottom: 18px; padding: 13px 16px; border-left: 3px solid var(--accent); background: var(--accent-tint); font-size: 12px; line-height: 1.5; color: var(--ink-2); }
 .setup-error { margin-bottom: 18px; padding: 12px 15px; border: 1px solid var(--warn); background: var(--surface); border-radius: 3px; color: var(--warn); font-size: 13px; }
 
+/* Invoice intake */
+.invoice-source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 20px; background: var(--surface-3); border-bottom: 1px solid var(--line-soft); }
+.invoice-source-card { min-height: 180px; padding: 20px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); display: flex; flex-direction: column; align-items: flex-start; }
+.invoice-source-card h3 { font-family: var(--display); font-size: 19px; margin: 2px 0 8px; }
+.invoice-source-card p { color: var(--muted); font-size: 13px; line-height: 1.5; flex: 1; }
+.invoice-editor { padding: 18px 20px; display: grid; gap: 16px; background: var(--surface-3); border-bottom: 1px solid var(--line-soft); }
+.invoice-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; font-size: 13px; }
+.invoice-editor-head > div > div, .invoice-editor-head > span { margin-top: 3px; color: var(--label); font-size: 12px; }
+.invoice-warning { padding: 11px 14px; border-left: 3px solid var(--warn); background: var(--surface); color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.invoice-editor .setup-error { margin-bottom: 0; }
+
 @media (max-width: 760px) {
   .page, .page.detail { padding: 24px 18px 60px; }
   .page-head, .detail-head { flex-direction: column; align-items: stretch; gap: 18px; }
   .detail-actions { align-items: stretch; }
   .stat-box { grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .setup-source-grid, .two-col, .three-col, .fin-grid { grid-template-columns: 1fr; }
+  .setup-source-grid, .invoice-source-grid, .two-col, .three-col, .fin-grid { grid-template-columns: 1fr; }
   .setup-source-card { min-height: 220px; padding: 22px; }
+  .invoice-source-card { min-height: 160px; }
+  .invoice-editor-head { flex-direction: column; }
   .tabs { overflow-x: auto; }
   .tab { flex: 0 0 auto; }
 }

@@ -181,6 +181,19 @@ export interface Invoice {
   fileHref: string | null;
 }
 
+export interface InvoiceCreateInput {
+  invoiceNumber: string;
+  invoiceDate: string;
+  amount: string;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export interface InvoicePreview {
+  draft: InvoiceCreateInput;
+  warnings: string[];
+}
+
 export interface ContractDocument {
   id: number;
   callOrderId: string | null; // null = BPA-level document
