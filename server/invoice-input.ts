@@ -1,4 +1,5 @@
 import type { InvoiceCreateInput } from "../shared/types.ts";
+import { currencyNumber } from "../shared/money.ts";
 
 export interface NormalizedInvoiceInput {
   invoiceNumber: string;
@@ -15,10 +16,7 @@ function validIsoDate(value: string): boolean {
 }
 
 function money(value: unknown): number | null {
-  const raw = String(value ?? "").trim().replace(/[$,\s]/g, "");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
+  return currencyNumber(value);
 }
 
 export function validateInvoiceInput(

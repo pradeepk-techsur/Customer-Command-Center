@@ -211,7 +211,8 @@ h1 { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spac
 .fin-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 18px; align-items: start; }
 .fin-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line-soft); font-size: 13px; align-items: baseline; }
 .fin-row .v { text-align: right; font-weight: 500; }
-.fin-edit { padding: 14px 18px; background: var(--surface-3); border-bottom: 1px solid var(--line-soft); display: flex; align-items: flex-end; gap: 12px; }
+.fin-edit { padding: 14px 18px; background: var(--surface-3); border-bottom: 1px solid var(--line-soft); display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.fin-edit .setup-error { flex-basis: 100%; margin: 0; }
 .footnote { padding: 12px 18px; font-family: var(--mono); font-size: 10px; color: var(--label); }
 .lcat-cols { grid-template-columns: 2fr 0.5fr 0.7fr 0.8fr 1fr; }
 
@@ -293,6 +294,11 @@ h1 { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spac
 .invoice-editor { padding: 18px 20px; display: grid; gap: 16px; background: var(--surface-3); border-bottom: 1px solid var(--line-soft); }
 .invoice-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; font-size: 13px; }
 .invoice-editor-head > div > div, .invoice-editor-head > span { margin-top: 3px; color: var(--label); font-size: 12px; }
+.invoice-file-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line-soft); }
+.invoice-file-row > div:first-child { flex: 1; font-size: 13px; }
+.invoice-file-row > div:first-child > div { margin-top: 3px; color: var(--label); font-size: 12px; }
+.invoice-file-link { display: inline-flex; align-items: center; text-decoration: none; }
+.invoice-attachment-error { margin: 14px 20px 0; }
 .invoice-warning { padding: 11px 14px; border-left: 3px solid var(--warn); background: var(--surface); color: var(--ink-2); font-size: 12px; line-height: 1.5; }
 .invoice-editor .setup-error { margin-bottom: 0; }
 

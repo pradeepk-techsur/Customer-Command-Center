@@ -44,6 +44,20 @@ function checkedPdf(req: express.Request, res: express.Response, required: boole
   return file;
 }
 
+async function storeInvoicePdf(file: Express.Multer.File): Promise<{ path: string; href: string }> {
+  const safe = basename(file.originalname).replace(/[^\w.\- ]+/g, "_") || "invoice.pdf";
+  const storedName = `${Date.now()}-${safe}`;
+  const path = join(uploadsDir, storedName);
+  await writeFile(path, file.buffer);
+  return { path, href: `/uploads/${storedName}` };
+}
+
+function managedUploadPath(href: string | null): string | null {
+  if (!href) return null;
+  const name = basename(href);
+  return href === `/uploads/${name}` ? join(uploadsDir, name) : null;
+}
+
 router.post("/preview", receiveInvoice, async (req, res) => {
   const file = checkedPdf(req, res, true);
   if (!file) return;
@@ -94,11 +108,9 @@ router.post("/", receiveInvoice, async (req, res, next) => {
 
   try {
     if (file) {
-      const safe = basename(file.originalname).replace(/[^\w.\- ]+/g, "_") || "invoice.pdf";
-      const storedName = `${Date.now()}-${safe}`;
-      storedPath = join(uploadsDir, storedName);
-      storedHref = `/uploads/${storedName}`;
-      await writeFile(storedPath, file.buffer);
+      const stored = await storeInvoicePdf(file);
+      storedPath = stored.path;
+      storedHref = stored.href;
     }
 
     const snapshot = await withTransaction(async (db) => {
@@ -109,12 +121,57 @@ router.post("/", receiveInvoice, async (req, res, next) => {
       );
       await audit(db, req, "invoice.create", "invoice", rows[0].id, {
         callOrderId,
-        source: file ? "pdf" : "manual",
+        source: req.body?.entryMode === "pdf" && file ? "pdf" : "manual",
+        fileAttached: Boolean(file),
         values: invoice,
       });
       return buildSnapshot(db, req.user!.id, req.user!.role);
     });
     res.status(201).json(snapshot);
+  } catch (error) {
+    if (storedPath) await unlink(storedPath).catch(() => undefined);
+    next(error);
+  }
+});
+
+router.post("/:invoiceId/file", receiveInvoice, async (req, res, next) => {
+  const file = checkedPdf(req, res, true);
+  if (!file) return;
+
+  let storedPath: string | null = null;
+  try {
+    const stored = await storeInvoicePdf(file);
+    storedPath = stored.path;
+    const callOrderId = callOrderIdParam(req);
+    const result = await withTransaction(async (db) => {
+      const { rows } = await db.query(
+        "select id, file_href from invoices where id = $1 and call_order_id is not distinct from $2",
+        [req.params.invoiceId, callOrderId],
+      );
+      const invoice = rows[0];
+      if (!invoice) return null;
+
+      await db.query("update invoices set file_href = $2 where id = $1", [invoice.id, stored.href]);
+      await audit(db, req, invoice.file_href ? "invoice.file.replace" : "invoice.file.attach", "invoice", invoice.id, {
+        callOrderId,
+        fileName: file.originalname,
+      });
+      return {
+        snapshot: await buildSnapshot(db, req.user!.id, req.user!.role),
+        previousPath: managedUploadPath(invoice.file_href),
+      };
+    });
+
+    if (!result) {
+      await unlink(stored.path).catch(() => undefined);
+      res.status(404).json({ error: "Invoice not found." });
+      return;
+    }
+
+    if (result.previousPath && result.previousPath !== stored.path) {
+      await unlink(result.previousPath).catch(() => undefined);
+    }
+    res.json(result.snapshot);
   } catch (error) {
     if (storedPath) await unlink(storedPath).catch(() => undefined);
     next(error);

@@ -5,6 +5,7 @@ import { useSort } from "../hooks/useSort.ts";
 import { burnColor, dateLabel, isStale, pctOf, rate, usd, usdFull } from "../lib/format.ts";
 import { Button, Field, SortHeaders, TextInput } from "./ui.tsx";
 import type { Mutate } from "../App.tsx";
+import { normalizeCurrency } from "../../shared/money.ts";
 
 const LCAT_COLS = [
   { key: "name", label: "BPA labor category" }, { key: "fte", label: "FTE", align: "right" as const },
@@ -14,21 +15,21 @@ const LCAT_COLS = [
 const emptyLcatForm = { name: "", fte: "", hours: "", rate: "" };
 
 export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: CallOrder; snapshot: PortalSnapshot; isPm: boolean; mutate: Mutate }) {
-  const [draft, setDraft] = useState(c.spend.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }));
-  useEffect(() => { 
-    setDraft(c.spend.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })); 
+  const [draft, setDraft] = useState(usdFull(c.spend));
+  const [spendError, setSpendError] = useState("");
+  useEffect(() => {
+    setDraft(usdFull(c.spend));
+    setSpendError("");
   }, [c.id, c.spend]);
-  
-  const handleSpendChange = (val: string) => {
-    // Allow typing numbers and format as currency
-    const numericValue = val.replace(/[^0-9]/g, '');
-    const formatted = numericValue ? parseInt(numericValue).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '';
-    setDraft(formatted);
-  };
-  
+
   const saveDraft = () => {
-    const numericValue = draft.replace(/[^0-9]/g, '');
-    mutate(() => api.saveSpend(c.id, numericValue));
+    const spend = normalizeCurrency(draft);
+    if (spend === null) {
+      setSpendError("Enter a non-negative dollar amount with no more than two decimal places.");
+      return;
+    }
+    setSpendError("");
+    mutate(() => api.saveSpend(c.id, spend));
   };
 
   const [showLcatForm, setShowLcatForm] = useState(false);
@@ -68,9 +69,10 @@ export function FinancialsTab({ order: c, snapshot, isPm, mutate }: { order: Cal
         {isPm && (
           <div className="fin-edit">
             <Field label="Update funds expended to date" style={{ flex: 1 }}>
-              <TextInput value={draft} onChange={handleSpendChange} placeholder="$0" />
+              <TextInput value={draft} onChange={(value) => { setDraft(value); setSpendError(""); }} placeholder="$0.00" />
             </Field>
             <Button primary onClick={saveDraft}>Save</Button>
+            {spendError && <div className="setup-error">{spendError}</div>}
           </div>
         )}
         {funding.map((r) => (

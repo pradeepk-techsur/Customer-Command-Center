@@ -1,4 +1,5 @@
 import type { CallOrderSetupInput } from "../shared/types.ts";
+import { currencyNumber } from "../shared/money.ts";
 
 export interface NormalizedCallOrderSetup {
   id?: string;
@@ -24,8 +25,7 @@ function validIsoDate(value: string): boolean {
 function money(value: unknown, fallback: number | null): number | null {
   const raw = String(value ?? "").trim();
   if (!raw) return fallback;
-  const parsed = Number(raw.replace(/[$,\s]/g, ""));
-  return Number.isFinite(parsed) ? parsed : null;
+  return currencyNumber(raw, true);
 }
 
 export function normalizeCallNumber(value: unknown): { id: string; groupKey: string } | null {
@@ -59,8 +59,8 @@ export function validateCallOrderSetup(
   if (!validIsoDate(popStart)) errors.popStart = "Enter a valid period start date.";
   if (!validIsoDate(popEnd)) errors.popEnd = "Enter a valid period end date.";
   if (validIsoDate(popStart) && validIsoDate(popEnd) && popEnd < popStart) errors.popEnd = "Period end must be on or after the start date.";
-  if (funded === null || funded < 0) errors.funded = "Funding must be a non-negative amount.";
-  if (spend === null || spend < 0) errors.spend = "Spend must be a non-negative amount.";
+  if (funded === null || funded < 0) errors.funded = "Funding must be a non-negative amount with no more than two decimal places.";
+  if (spend === null || spend < 0) errors.spend = "Spend must be a non-negative amount with no more than two decimal places.";
   if (String(input.eac ?? "").trim() && (eac === null || eac < 0)) errors.eac = "EAC must be a non-negative amount.";
   if (String(input.overUnder ?? "").trim() && overUnder === null) errors.overUnder = "Over/under must be a valid amount.";
 

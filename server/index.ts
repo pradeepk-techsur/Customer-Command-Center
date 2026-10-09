@@ -26,6 +26,7 @@ import actionItemsRouter, { archiveRouter as actionItemsArchiveRouter } from "./
 import approvedUsersRouter from "./routes/approved-users.ts";
 import callOrdersRouter from "./routes/call-orders.ts";
 import { normalizeCallNumber } from "./call-order-setup.ts";
+import { normalizeCurrency } from "../shared/money.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -154,8 +155,8 @@ app.get("/api/audit", requirePm, async (req, res, next) => {
 app.patch("/api/call-orders/:id/spend", authenticateRequest, requirePm, requireCallOrderAccess, mutation(async (db, req, res) => {
   const c = await callOrderOr404(db, req.params.id as string, res);
   if (!c) return false;
-  const spend = num(req.body?.spend);
-  if (spend === null || spend < 0) { res.status(400).json({ error: "Funds expended must be a non-negative amount." }); return false; }
+  const spend = normalizeCurrency(req.body?.spend);
+  if (spend === null) { res.status(400).json({ error: "Funds expended must be a non-negative amount with no more than two decimal places." }); return false; }
   // Capture snapshot before update
   await captureCallOrderSnapshot(db, c.id, req.user?.id ?? null, "Spend updated", ["spend"]);
   await db.query("update call_orders set spend = $2, fin_updated_on = current_date where id = $1", [c.id, spend]);

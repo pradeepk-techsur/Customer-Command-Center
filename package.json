@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "start": "node --experimental-strip-types server/index.ts",
     "preview": "vite preview",
-    "test": "tsx --test server/call-order-award-parser.test.ts server/call-order-setup.test.ts server/call-order-label.test.ts server/invoice-input.test.ts server/invoice-parser.test.ts",
+    "test": "tsx --test server/money.test.ts server/call-order-award-parser.test.ts server/call-order-setup.test.ts server/call-order-label.test.ts server/invoice-input.test.ts server/invoice-parser.test.ts",
     "typecheck": "tsc -b",
     "db:migrate": "tsx server/migrate.ts",
     "db:seed": "tsx server/seed.ts"

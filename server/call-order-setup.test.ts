@@ -18,7 +18,7 @@ test("validates and normalizes a complete setup", () => {
     popStart: "2026-09-25",
     popEnd: "2027-09-24",
     funded: "$5,447,029.88",
-    spend: "0",
+    spend: "$1,234.56",
     eac: "",
     overUnder: "-10.50",
     pm: "",
@@ -26,8 +26,22 @@ test("validates and normalizes a complete setup", () => {
 
   assert.deepEqual(result.errors, {});
   assert.equal(result.value?.funded, 5447029.88);
+  assert.equal(result.value?.spend, 1234.56);
   assert.equal(result.value?.overUnder, -10.5);
   assert.equal(result.value?.pm, "Unassigned");
+});
+
+test("rejects spend with more than two decimal places", () => {
+  const result = validateCallOrderSetup({
+    callNumber: "20",
+    name: "Enterprise Architecture Support",
+    popStart: "2026-09-25",
+    popEnd: "2027-09-24",
+    funded: "1000.00",
+    spend: "10.999",
+  }, true);
+
+  assert.ok(result.errors.spend);
 });
 
 test("rejects invalid dates and negative funding", () => {

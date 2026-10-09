@@ -190,11 +190,16 @@ export const api = {
     const body = new FormData(); body.append("file", file);
     return request<InvoicePreview>(`/api/scope/${scope(callOrderId)}/invoices/preview`, { method: "POST", body });
   },
-  addInvoice: (callOrderId: string | null, input: InvoiceCreateInput, file?: File) => {
+  addInvoice: (callOrderId: string | null, input: InvoiceCreateInput, file?: File, entryMode: "manual" | "pdf" = "manual") => {
     const body = new FormData();
     body.append("details", JSON.stringify(input));
+    body.append("entryMode", entryMode);
     if (file) body.append("file", file);
     return request<PortalSnapshot>(`/api/scope/${scope(callOrderId)}/invoices`, { method: "POST", body });
+  },
+  attachInvoiceFile: (callOrderId: string | null, invoiceId: number, file: File) => {
+    const body = new FormData(); body.append("file", file);
+    return request<PortalSnapshot>(`/api/scope/${scope(callOrderId)}/invoices/${invoiceId}/file`, { method: "POST", body });
   },
   updateInvoice: (callOrderId: string | null, invoiceId: number, input: { paymentStatus?: string; paidDate?: string }) =>
     request(`/api/scope/${scope(callOrderId)}/invoices/${invoiceId}`, { method: "PATCH", body: json(input) }),
