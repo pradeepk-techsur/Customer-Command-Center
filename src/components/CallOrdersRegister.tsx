@@ -1,30 +1,15 @@
-import type { CallOrder, PortalSnapshot } from "../../shared/types.ts";
+import type { PortalSnapshot } from "../../shared/types.ts";
 import { useSort } from "../hooks/useSort.ts";
-import { burnColor, callOrderLabel, dateLabel, filled, isVacant, localDate, mostOverdueStamp, pctOf, periodState, usd, usdFull } from "../lib/format.ts";
+import { burnColor, callOrderLabel, dateLabel, filled, isVacant, localDate, mostOverdueStamp, pctOf, usd, usdFull } from "../lib/format.ts";
+import { groupCallOrders, type CallOrderGroup } from "../lib/callOrderGroups.ts";
 import { Button, Eyebrow, SortHeaders } from "./ui.tsx";
 import type { Tab } from "./CallOrderDetail.tsx";
 
-export interface Group { key: string; name: string; periods: CallOrder[]; current: CallOrder }
-
-/** One row per call order: option periods roll up onto the period that is current today. */
-export function groupCallOrders(orders: CallOrder[], today: string): Group[] {
-  const groups: Group[] = [];
-  for (const c of orders) {
-    let g = groups.find((x) => x.key === c.groupKey);
-    if (!g) { g = { key: c.groupKey, name: c.groupName, periods: [], current: c }; groups.push(g); }
-    g.periods.push(c);
-  }
-  for (const g of groups) {
-    g.current = g.periods.find((p) => periodState(p, today) === "current")
-      || g.periods.filter((p) => periodState(p, today) === "prior").slice(-1)[0]
-      || g.periods[0];
-  }
-  return groups;
-}
+export type Group = CallOrderGroup;
 
 const COLS = [
   { key: "co", label: "Call order" }, { key: "pop", label: "Period of performance" },
-  { key: "people", label: "People", align: "right" as const }, { key: "funded", label: "Funded", align: "right" as const },
+  { key: "people", label: "Assigned", align: "right" as const }, { key: "funded", label: "Funded", align: "right" as const },
   { key: "spend", label: "Actual spend", align: "right" as const }, { key: "updated", label: "Last updated", align: "right" as const },
 ];
 
@@ -44,8 +29,8 @@ export function CallOrdersRegister({ snapshot, isPm, onOpen, onBackToDashboard, 
 
   const totalFunded = all.reduce((s, c) => s + c.funded, 0);
   const totalSpend = all.reduce((s, c) => s + c.spend, 0);
-  const assigned = all.reduce((s, c) => s + filled(c), 0);
-  const open = all.reduce((s, c) => s + c.staff.filter((x) => isVacant(x.name)).length, 0);
+  const assigned = groups.reduce((sum, group) => sum + filled(group.current), 0);
+  const open = groups.reduce((sum, group) => sum + group.current.staff.filter(isVacant).length, 0);
 
   return (
     <div className="page">

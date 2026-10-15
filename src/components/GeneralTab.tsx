@@ -3,7 +3,7 @@ import type { CallOrder } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { callOrderLabel, localDate, periodState } from "../lib/format.ts";
 import { TextArea } from "./ui.tsx";
-import type { Group } from "./CallOrdersRegister.tsx";
+import type { CallOrderGroup as Group } from "../lib/callOrderGroups.ts";
 import type { Mutate } from "../App.tsx";
 
 /** True when the period's end date is today or within the next 60 days. */

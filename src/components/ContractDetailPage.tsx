@@ -1,7 +1,7 @@
 import type { PortalSnapshot } from "../../shared/types.ts";
 import { callOrderLabel, filled, usdFull } from "../lib/format.ts";
+import { groupCallOrders } from "../lib/callOrderGroups.ts";
 import { Button, Eyebrow } from "./ui.tsx";
-import { groupCallOrders } from "./CallOrdersRegister.tsx";
 
 export function ContractDetailPage({ snapshot, canManageCallOrders, onAddCallOrder, onSelectCallOrder }: {
   snapshot: PortalSnapshot; canManageCallOrders: boolean; onAddCallOrder: () => void; onSelectCallOrder: (id: string) => void;
@@ -21,7 +21,7 @@ export function ContractDetailPage({ snapshot, canManageCallOrders, onAddCallOrd
         <div className="stat-box">
           <div><Eyebrow>Obligated</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usdFull(contract.funded)}</div></div>
           <div><Eyebrow>Expended</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usdFull(contract.spend)}</div></div>
-          <div><Eyebrow>People</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{contract.peopleAssigned}</div></div>
+          <div><Eyebrow>Assigned people</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{contract.peopleAssigned}</div></div>
         </div>
       </div>
 
@@ -35,7 +35,7 @@ export function ContractDetailPage({ snapshot, canManageCallOrders, onAddCallOrd
             const c = g.current;
             return (
               <button key={g.key} type="button" className="fin-row" style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: 0, borderBottom: "1px solid var(--line-soft)" }} onClick={() => onSelectCallOrder(c.id)}>
-                <div style={{ color: "var(--ink-2)" }}>{callOrderLabel(g.name, g.key)}<div style={{ color: "var(--ink-3)", fontSize: 11 }}>{filled(c)} people · {usdFull(c.funded)} funded</div></div>
+                <div style={{ color: "var(--ink-2)" }}>{callOrderLabel(g.name, g.key)}<div style={{ color: "var(--ink-3)", fontSize: 11 }}>{filled(c)} assigned · {usdFull(c.funded)} funded</div></div>
                 <div className="v num">{usdFull(c.spend)}</div>
               </button>
             );

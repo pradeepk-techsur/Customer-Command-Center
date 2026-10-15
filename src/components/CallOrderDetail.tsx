@@ -3,7 +3,7 @@ import type { CallOrder, PortalSnapshot } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { callOrderLabel, filled, normalizeCallOrderId, periodState, usd } from "../lib/format.ts";
 import { Button, Eyebrow, Field, TextInput } from "./ui.tsx";
-import { groupCallOrders } from "./CallOrdersRegister.tsx";
+import { groupCallOrders } from "../lib/callOrderGroups.ts";
 import { GeneralTab } from "./GeneralTab.tsx";
 import { FinancialsTab } from "./FinancialsTab.tsx";
 import { PeopleTab } from "./PeopleTab.tsx";
@@ -73,7 +73,7 @@ export function CallOrderDetail({ snapshot, order: c, tab, isPm, canManageCallOr
           <div className="stat-box">
             <div><Eyebrow>Obligated</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usd(c.funded)}</div></div>
             <div><Eyebrow>Expended</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{usd(c.spend)}</div></div>
-            <div><Eyebrow>People</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{staffCount}</div></div>
+            <div><Eyebrow>Assigned people</Eyebrow><div className="value num" style={{ marginTop: 5 }}>{staffCount}</div></div>
           </div>
         </div>
       </div>

@@ -85,14 +85,42 @@ async function loadContract(db: Queryable, severityMatrix: SeverityMatrix): Prom
     db.query("select * from risks where call_order_id is null order by status, created_at desc"),
     db.query("select * from issues where call_order_id is null order by status, created_at desc"),
     db.query(
-      `select
+      `with ranked_call_orders as (
+         select co.*,
+                row_number() over (
+                  partition by co.group_key
+                  order by
+                    case
+                      when co.pop_start is null or co.pop_end is null
+                        or current_date between co.pop_start and co.pop_end then 0
+                      when co.pop_end < current_date then 1
+                      else 2
+                    end,
+                    case when co.pop_start is null or co.pop_end is null
+                               or current_date between co.pop_start and co.pop_end
+                         then co.pop_start end desc nulls last,
+                    case when co.pop_end < current_date then co.pop_end end desc nulls last,
+                    case when co.pop_start > current_date then co.pop_start end asc nulls last,
+                    co.id desc
+                ) as effective_rank
+           from call_orders co
+          where not co.pending
+       )
+       select
          coalesce(sum(co.funded), 0) as funded,
          coalesce(sum(co.spend), 0) as spend,
          coalesce(sum(co.eac), 0) as eac,
-         coalesce((select count(*) from staff s join call_orders c2 on c2.id = s.call_order_id
-                   where not c2.pending and not (s.name ilike 'VACANT%')
-                     and s.status not ilike '%offboarded%' and s.status not ilike '%no longer available%'), 0) as people
-       from call_orders co where not co.pending`,
+         coalesce((
+           select count(*)
+             from staff s
+             join ranked_call_orders current_co
+               on current_co.id = s.call_order_id and current_co.effective_rank = 1
+            where btrim(coalesce(s.name, '')) not ilike 'VACANT%'
+              and lower(btrim(coalesce(s.status, ''))) <> 'vacant'
+              and coalesce(s.status, '') not ilike '%offboarded%'
+              and coalesce(s.status, '') not ilike '%no longer available%'
+         ), 0) as people
+       from ranked_call_orders co`,
     ),
   ]);
   const c = contractRes.rows[0] || {
@@ -102,7 +130,7 @@ async function loadContract(db: Queryable, severityMatrix: SeverityMatrix): Prom
   return {
     id: c.id, name: c.name, agency: c.agency, vehicle: c.vehicle, number: c.number,
     popStart: c.pop_start, popEnd: c.pop_end,
-    funded: rollup.funded, spend: rollup.spend, eac: rollup.eac || null, peopleAssigned: rollup.people,
+    funded: rollup.funded, spend: rollup.spend, eac: rollup.eac || null, peopleAssigned: Number(rollup.people),
     clins: clinsRes.rows.map((row) => toClin(row, clinSpendRes.rows)),
     invoices: invoicesRes.rows.map(toInvoice),
     contractDocuments: docsRes.rows.map(toContractDocument),

@@ -30,9 +30,10 @@ export function normalizeCallOrderId(value: string | null | undefined): string |
   return `Call ${number}${period === null ? "" : `.${period}`}`;
 }
 
-export const isVacant = (name: string) => /^VACANT/i.test(name);
+export const isVacant = (s: Pick<StaffMember, "name" | "status">) =>
+  /^VACANT/i.test(String(s.name || "").trim()) || /^vacant$/i.test(String(s.status || "").trim());
 export const isDeparted = (status: string) => /offboarded|no longer available/i.test(status || "");
-export const isAssigned = (s: StaffMember) => !isVacant(s.name) && !isDeparted(s.status);
+export const isAssigned = (s: StaffMember) => !isVacant(s) && !isDeparted(s.status);
 export const filled = (c: CallOrder) => c.staff.filter(isAssigned).length;
 
 /** Burn thresholds (fixed policy): below 75% accent, 75–85% amber, 86%+ red. */

@@ -12,7 +12,7 @@ const STAFF_COLS = [
   { key: "rate", label: "Rate", align: "right" as const }, { key: "status", label: "Status", align: "right" as const },
 ];
 
-const nameClass = (s: StaffMember) => "name" + (isVacant(s.name) ? " vacant" : isDeparted(s.status) ? " departed" : "");
+const nameClass = (s: StaffMember) => "name" + (isVacant(s) ? " vacant" : isDeparted(s.status) ? " departed" : "");
 
 export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
   order: CallOrder; snapshot: PortalSnapshot; isPm: boolean; mutate: Mutate; onSelectStaff?: (staffId: number) => void;
@@ -36,7 +36,7 @@ export function PeopleTab({ order: c, snapshot, isPm, mutate, onSelectStaff }: {
   const tiles = [
     { label: "Contracted FTE", value: contractedFte || "—" },
     { label: "Assigned", value: filled(c) },
-    { label: "Vacant", value: c.staff.filter((s) => isVacant(s.name)).length },
+    { label: "Vacant", value: c.staff.filter(isVacant).length },
     { label: "Departed", value: c.staff.filter((s) => isDeparted(s.status)).length },
     { label: "Labor categories", value: new Set(c.laborCategories.map((l) => l.name)).size || "—" },
   ];
