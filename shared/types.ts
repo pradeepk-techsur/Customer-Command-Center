@@ -266,8 +266,9 @@ export interface ActionItem {
 
 export interface WeeklyMeetingAction {
   id: number;
-  description: string;
-  assignedTo: string;
+  name: string;
+  description: string | null;
+  dateAssigned: string;
   status: 'open' | 'closed';
   createdAt: string;
   closedAt: string | null;

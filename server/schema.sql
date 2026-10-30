@@ -507,15 +507,10 @@ alter table action_items
   add column if not exists weekly_meeting_id integer references weekly_meetings(id) on delete cascade;
 create index if not exists action_items_weekly_meeting_idx on action_items(weekly_meeting_id);
 
-do $$
-begin
-  if not exists (select 1 from pg_constraint where conname = 'meeting_action_required_fields') then
-    alter table action_items add constraint meeting_action_required_fields check (
-      weekly_meeting_id is null or
-      (btrim(name) <> '' and description is not null and btrim(description) <> '')
-    );
-  end if;
-end $$;
+alter table action_items drop constraint if exists meeting_action_required_fields;
+alter table action_items add constraint meeting_action_required_fields check (
+  weekly_meeting_id is null or btrim(name) <> ''
+);
 
 -- ============================================================================
 -- Mission Control Slice 1: Approved-user allowlist, magic-link auth, auth events

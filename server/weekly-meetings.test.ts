@@ -11,10 +11,12 @@ test("weekly meeting validation requires a real date and agenda", () => {
   assert.equal(validateMeetingInput({ meetingDate: "2026-10-28", agenda: " " }), null);
 });
 
-test("meeting actions require both description and free-form assignee", () => {
-  assert.deepEqual(validateMeetingActionInput({ description: "  Send minutes ", assignedTo: " Joan " }), {
-    description: "Send minutes", assignedTo: "Joan",
+test("meeting actions match call-order action item validation", () => {
+  assert.deepEqual(validateMeetingActionInput({ name: " Joan ", description: "  Send minutes " }), {
+    name: "Joan", description: "Send minutes",
   });
-  assert.equal(validateMeetingActionInput({ description: "Send minutes", assignedTo: "" }), null);
-  assert.equal(validateMeetingActionInput({ description: "", assignedTo: "Joan" }), null);
+  assert.deepEqual(validateMeetingActionInput({ name: "Joan", description: "" }), {
+    name: "Joan", description: null,
+  });
+  assert.equal(validateMeetingActionInput({ name: "", description: "Send minutes" }), null);
 });

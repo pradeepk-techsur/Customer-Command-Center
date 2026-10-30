@@ -252,9 +252,9 @@ export const api = {
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}`, { method: "PATCH", body: json(input) }),
   removeWeeklyMeeting: (meetingId: number) =>
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}`, { method: "DELETE" }),
-  addMeetingAction: (meetingId: number, input: { description: string; assignedTo: string }) =>
+  addMeetingAction: (meetingId: number, input: { name: string; description: string }) =>
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}/actions`, { method: "POST", body: json(input) }),
-  updateMeetingAction: (meetingId: number, actionId: number, input: { description?: string; assignedTo?: string; status?: string }) =>
+  updateMeetingAction: (meetingId: number, actionId: number, input: { name?: string; description?: string; status?: string }) =>
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}/actions/${actionId}`, { method: "PATCH", body: json(input) }),
   removeMeetingAction: (meetingId: number, actionId: number) =>
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}/actions/${actionId}`, { method: "DELETE" }),

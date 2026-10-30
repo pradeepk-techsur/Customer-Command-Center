@@ -25,11 +25,11 @@ export function validateMeetingInput(body: unknown): { meetingDate: string; agen
   return validIsoDate(meetingDate) && agenda ? { meetingDate, agenda } : null;
 }
 
-export function validateMeetingActionInput(body: unknown): { description: string; assignedTo: string } | null {
-  const input = (body || {}) as { description?: unknown; assignedTo?: unknown };
-  const description = text(input.description);
-  const assignedTo = text(input.assignedTo);
-  return description && assignedTo ? { description, assignedTo } : null;
+export function validateMeetingActionInput(body: unknown): { name: string; description: string | null } | null {
+  const input = (body || {}) as { name?: unknown; description?: unknown; assignedTo?: unknown };
+  const name = text(input.name ?? input.assignedTo);
+  const description = text(input.description) || null;
+  return name ? { name, description } : null;
 }
 
 async function loadMeetings(db: Queryable): Promise<WeeklyMeeting[]> {
@@ -49,8 +49,9 @@ async function loadMeetings(db: Queryable): Promise<WeeklyMeeting[]> {
       .filter((action) => action.weekly_meeting_id === meeting.id)
       .map((action): WeeklyMeetingAction => ({
         id: action.id,
+        name: action.name,
         description: action.description,
-        assignedTo: action.name,
+        dateAssigned: action.date_assigned,
         status: action.status,
         createdAt: iso(action.created_at),
         closedAt: action.closed_at ? iso(action.closed_at) : null,
@@ -114,7 +115,7 @@ router.delete("/:meetingId", async (req, res, next) => {
       await db.query("delete from weekly_meetings where id = $1", [meeting.id]);
       await audit(db, req, "weekly_meeting.delete", "weekly_meeting", meeting.id, {
         meetingDate: meeting.meeting_date, agenda: meeting.agenda,
-        actions: actions.rows.map((action) => ({ id: action.id, assignedTo: action.name, description: action.description, status: action.status, closedAt: action.closed_at })),
+        actions: actions.rows.map((action) => ({ id: action.id, name: action.name, description: action.description, status: action.status, closedAt: action.closed_at })),
       });
       return loadMeetings(db);
     });
@@ -125,7 +126,7 @@ router.delete("/:meetingId", async (req, res, next) => {
 
 router.post("/:meetingId/actions", async (req, res, next) => {
   const input = validateMeetingActionInput(req.body);
-  if (!input) { res.status(400).json({ error: "Action description and Assigned To are required." }); return; }
+  if (!input) { res.status(400).json({ error: "A name is required." }); return; }
   try {
     const meetings = await withTransaction(async (db) => {
       const meeting = await db.query("select id from weekly_meetings where id = $1", [req.params.meetingId]);
@@ -133,7 +134,7 @@ router.post("/:meetingId/actions", async (req, res, next) => {
       const { rows } = await db.query<{ id: number }>(
         `insert into action_items (weekly_meeting_id, call_order_id, name, description, date_assigned)
          values ($1,null,$2,$3,current_date) returning id`,
-        [meeting.rows[0].id, input.assignedTo, input.description],
+        [meeting.rows[0].id, input.name, input.description],
       );
       await audit(db, req, "action_item.create", "action_item", rows[0].id, { weeklyMeetingId: meeting.rows[0].id, ...input, status: "open" });
       return loadMeetings(db);
@@ -150,22 +151,22 @@ router.patch("/:meetingId/actions/:actionId", async (req, res, next) => {
       const before = rows[0];
       if (!before) return null;
       const input = validateMeetingActionInput({
-        description: req.body?.description ?? before.description,
-        assignedTo: req.body?.assignedTo ?? before.name,
+        name: req.body?.name ?? req.body?.assignedTo ?? before.name,
+        description: req.body?.description === undefined ? before.description : req.body.description,
       });
       const status = req.body?.status === undefined ? before.status : text(req.body.status);
       if (!input || !["open", "closed"].includes(status)) return "invalid" as const;
       const closedAt = status === "closed" && before.status !== "closed" ? new Date() : status === "open" ? null : before.closed_at;
-      await db.query("update action_items set name = $2, description = $3, status = $4, closed_at = $5 where id = $1", [before.id, input.assignedTo, input.description, status, closedAt]);
+      await db.query("update action_items set name = $2, description = $3, status = $4, closed_at = $5 where id = $1", [before.id, input.name, input.description, status, closedAt]);
       await db.query("update weekly_meetings set updated_by = $2, updated_at = now() where id = $1", [before.weekly_meeting_id, req.user!.id]);
       await audit(db, req, before.status === status ? "action_item.update" : "action_item.status", "action_item", before.id, {
         weeklyMeetingId: before.weekly_meeting_id,
-        before: { description: before.description, assignedTo: before.name, status: before.status },
+        before: { name: before.name, description: before.description, status: before.status },
         after: { ...input, status },
       });
       return loadMeetings(db);
     });
-    if (meetings === "invalid") { res.status(400).json({ error: "Action description, Assigned To, and a valid status are required." }); return; }
+    if (meetings === "invalid") { res.status(400).json({ error: "A name and valid status are required." }); return; }
     if (!meetings) { res.status(404).json({ error: "Meeting action item not found." }); return; }
     res.json({ meetings });
   } catch (error) { next(error); }
@@ -179,7 +180,7 @@ router.delete("/:meetingId/actions/:actionId", async (req, res, next) => {
       if (!action) return null;
       await db.query("update weekly_meetings set updated_by = $2, updated_at = now() where id = $1", [action.weekly_meeting_id, req.user!.id]);
       await audit(db, req, "action_item.delete", "action_item", action.id, {
-        weeklyMeetingId: action.weekly_meeting_id, description: action.description, assignedTo: action.name, status: action.status,
+        weeklyMeetingId: action.weekly_meeting_id, name: action.name, description: action.description, status: action.status,
       });
       return loadMeetings(db);
     });
