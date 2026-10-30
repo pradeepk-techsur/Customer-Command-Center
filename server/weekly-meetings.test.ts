@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validIsoDate, validateMeetingActionInput, validateMeetingInput } from "./routes/weekly-meetings.ts";
+import { validIsoDate, validateMeetingActionInput, validateMeetingActions, validateMeetingInput } from "./routes/weekly-meetings.ts";
 
 test("weekly meeting validation requires a real date and agenda", () => {
   assert.equal(validIsoDate("2026-02-29"), false);
@@ -19,4 +19,16 @@ test("meeting actions match call-order action item validation", () => {
     name: "Joan", description: null,
   });
   assert.equal(validateMeetingActionInput({ name: "", description: "Send minutes" }), null);
+});
+
+test("a meeting can save its action items in the same request", () => {
+  assert.deepEqual(validateMeetingActions({ actions: [
+    { name: " Joan ", description: " Send minutes " },
+    { name: "Paul", description: "" },
+  ] }), [
+    { name: "Joan", description: "Send minutes" },
+    { name: "Paul", description: null },
+  ]);
+  assert.deepEqual(validateMeetingActions({}), []);
+  assert.equal(validateMeetingActions({ actions: [{ name: "", description: "Missing owner" }] }), null);
 });

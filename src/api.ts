@@ -246,9 +246,9 @@ export const api = {
 
   // Weekly Meetings (Customer, Program Manager, and Administrator only)
   getWeeklyMeetings: () => request<{ meetings: WeeklyMeeting[] }>("/api/weekly-meetings"),
-  createWeeklyMeeting: (input: { meetingDate: string; agenda: string }) =>
+  createWeeklyMeeting: (input: { meetingDate: string; agenda: string; actions?: Array<{ name: string; description: string }> }) =>
     request<{ meetings: WeeklyMeeting[] }>("/api/weekly-meetings", { method: "POST", body: json(input) }),
-  updateWeeklyMeeting: (meetingId: number, input: { meetingDate: string; agenda: string }) =>
+  updateWeeklyMeeting: (meetingId: number, input: { meetingDate: string; agenda: string; actions?: Array<{ name: string; description: string }> }) =>
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}`, { method: "PATCH", body: json(input) }),
   removeWeeklyMeeting: (meetingId: number) =>
     request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}`, { method: "DELETE" }),

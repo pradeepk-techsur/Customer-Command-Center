@@ -19,7 +19,11 @@ router.post("/", mutation(async (db, req, res) => {
 }));
 
 router.patch("/:actionItemId", mutation(async (db, req, res) => {
-  const { rows } = await db.query("select * from action_items where id = $1", [req.params.actionItemId]);
+  const callOrderId = callOrderIdParam(req);
+  const { rows } = await db.query(
+    "select * from action_items where id = $1 and call_order_id is not distinct from $2",
+    [req.params.actionItemId, callOrderId],
+  );
   const a = rows[0];
   if (!a) { res.status(404).json({ error: "Action item not found." }); return false; }
   const status = str(req.body?.status);
@@ -33,7 +37,11 @@ router.patch("/:actionItemId", mutation(async (db, req, res) => {
 }));
 
 router.delete("/:actionItemId", mutation(async (db, req, res) => {
-  const { rows } = await db.query("delete from action_items where id = $1 returning *", [req.params.actionItemId]);
+  const callOrderId = callOrderIdParam(req);
+  const { rows } = await db.query(
+    "delete from action_items where id = $1 and call_order_id is not distinct from $2 returning *",
+    [req.params.actionItemId, callOrderId],
+  );
   if (!rows[0]) { res.status(404).json({ error: "Action item not found." }); return false; }
   await audit(db, req, "action_item.delete", "action_item", rows[0].id, {});
 }));

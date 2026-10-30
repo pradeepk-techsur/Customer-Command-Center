@@ -2,7 +2,7 @@ import express from "express";
 import type { Queryable } from "../db.ts";
 import { pool, withTransaction } from "../db.ts";
 import { authenticateRequest, requireMeetingReportAccess } from "../auth-middleware.ts";
-import { audit } from "../route-helpers.ts";
+import { audit, type Db } from "../route-helpers.ts";
 import type { WeeklyMeeting, WeeklyMeetingAction } from "../../shared/types.ts";
 
 const router = express.Router();
@@ -30,6 +30,34 @@ export function validateMeetingActionInput(body: unknown): { name: string; descr
   const name = text(input.name ?? input.assignedTo);
   const description = text(input.description) || null;
   return name ? { name, description } : null;
+}
+
+export function validateMeetingActions(body: unknown): Array<{ name: string; description: string | null }> | null {
+  const actions = (body as { actions?: unknown } | null)?.actions;
+  if (actions === undefined) return [];
+  if (!Array.isArray(actions) || actions.length > 100) return null;
+  const validated = actions.map(validateMeetingActionInput);
+  return validated.every((action) => action !== null)
+    ? validated as Array<{ name: string; description: string | null }>
+    : null;
+}
+
+async function insertMeetingActions(
+  db: Db,
+  req: express.Request,
+  meetingId: number,
+  actions: Array<{ name: string; description: string | null }>,
+): Promise<void> {
+  for (const action of actions) {
+    const { rows } = await db.query<{ id: number }>(
+      `insert into action_items (weekly_meeting_id, call_order_id, name, description, date_assigned)
+       values ($1,null,$2,$3,current_date) returning id`,
+      [meetingId, action.name, action.description],
+    );
+    await audit(db, req, "action_item.create", "action_item", rows[0].id, {
+      weeklyMeetingId: meetingId, ...action, status: "open",
+    });
+  }
 }
 
 async function loadMeetings(db: Queryable): Promise<WeeklyMeeting[]> {
@@ -70,6 +98,8 @@ router.get("/", async (_req, res, next) => {
 router.post("/", async (req, res, next) => {
   const input = validateMeetingInput(req.body);
   if (!input) { res.status(400).json({ error: "Meeting date and agenda are required." }); return; }
+  const actions = validateMeetingActions(req.body);
+  if (!actions) { res.status(400).json({ error: "Every action item requires a name." }); return; }
   try {
     const meetings = await withTransaction(async (db) => {
       const { rows } = await db.query<{ id: number }>(
@@ -77,6 +107,7 @@ router.post("/", async (req, res, next) => {
         [input.meetingDate, input.agenda, req.user!.id],
       );
       await audit(db, req, "weekly_meeting.create", "weekly_meeting", rows[0].id, input);
+      await insertMeetingActions(db, req, rows[0].id, actions);
       return loadMeetings(db);
     });
     res.status(201).json({ meetings });
@@ -86,6 +117,8 @@ router.post("/", async (req, res, next) => {
 router.patch("/:meetingId", async (req, res, next) => {
   const input = validateMeetingInput(req.body);
   if (!input) { res.status(400).json({ error: "Meeting date and agenda are required." }); return; }
+  const actions = validateMeetingActions(req.body);
+  if (!actions) { res.status(400).json({ error: "Every action item requires a name." }); return; }
   try {
     const meetings = await withTransaction(async (db) => {
       const { rows } = await db.query("select * from weekly_meetings where id = $1", [req.params.meetingId]);
@@ -98,6 +131,7 @@ router.patch("/:meetingId", async (req, res, next) => {
       await audit(db, req, "weekly_meeting.update", "weekly_meeting", before.id, {
         before: { meetingDate: before.meeting_date, agenda: before.agenda }, after: input,
       });
+      await insertMeetingActions(db, req, before.id, actions);
       return loadMeetings(db);
     });
     if (!meetings) { res.status(404).json({ error: "Weekly meeting not found." }); return; }
