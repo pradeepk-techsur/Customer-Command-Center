@@ -249,6 +249,25 @@ export function requireAdminOrProgramManager(req: Request, res: Response, next: 
   next();
 }
 
+/** Weekly Meetings and Reports are intentionally available only to customers, Program Managers,
+ * and administrators. Customers have write access only inside the Weekly Meetings router. */
+export function requireMeetingReportAccess(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", message: "Must be authenticated to access this resource" });
+    return;
+  }
+
+  if (req.user.role !== "customer" && req.user.role !== "program_manager" && req.user.role !== "admin") {
+    res.status(403).json({
+      error: "Insufficient permissions",
+      message: "This resource is available only to Customers, Program Managers, and Administrators"
+    });
+    return;
+  }
+
+  next();
+}
+
 /**
  * Require weekly-report lock/correct authority (spec §5.1/§17.7, decision #10):
  * Program Managers/admins always have it; Paul can additionally designate other users

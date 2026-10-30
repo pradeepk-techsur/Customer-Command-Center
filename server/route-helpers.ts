@@ -9,8 +9,8 @@ export type Db = pg.PoolClient;
 export async function audit(db: Db, req: express.Request, action: string, entity: string, entityId: string | number | null, details?: unknown) {
   const actor = actorOf(req);
   await db.query(
-    "insert into audit_log (actor, role, action, entity, entity_id, details) values ($1,$2,$3,$4,$5,$6)",
-    [actor.name, actor.role, action, entity, entityId === null ? null : String(entityId), details === undefined ? null : JSON.stringify(details)],
+    "insert into audit_log (actor, role, action, entity, entity_id, details, user_id) values ($1,$2,$3,$4,$5,$6,$7)",
+    [actor.name, actor.role, action, entity, entityId === null ? null : String(entityId), details === undefined ? null : JSON.stringify(details), actor.userId ?? req.user?.id ?? null],
   );
 }
 

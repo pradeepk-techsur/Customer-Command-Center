@@ -490,6 +490,33 @@ create table if not exists action_items (
 create index if not exists action_items_call_order_idx on action_items(call_order_id);
 create index if not exists action_items_weekly_report_idx on action_items(weekly_report_id);
 
+-- BPA-level meeting register. Meeting actions reuse the governed action_items table rather than
+-- copying action data into a report-specific structure.
+create table if not exists weekly_meetings (
+  id              serial primary key,
+  meeting_date    date not null,
+  agenda          text not null check (btrim(agenda) <> ''),
+  created_by      integer references users(id) on delete set null,
+  updated_by      integer references users(id) on delete set null,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists weekly_meetings_date_idx on weekly_meetings(meeting_date desc, id desc);
+
+alter table action_items
+  add column if not exists weekly_meeting_id integer references weekly_meetings(id) on delete cascade;
+create index if not exists action_items_weekly_meeting_idx on action_items(weekly_meeting_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'meeting_action_required_fields') then
+    alter table action_items add constraint meeting_action_required_fields check (
+      weekly_meeting_id is null or
+      (btrim(name) <> '' and description is not null and btrim(description) <> '')
+    );
+  end if;
+end $$;
+
 -- ============================================================================
 -- Mission Control Slice 1: Approved-user allowlist, magic-link auth, auth events
 -- ============================================================================

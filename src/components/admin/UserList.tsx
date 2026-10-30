@@ -37,7 +37,10 @@ export function UserList({ users, onEdit, onDelete, onResetPassword }: UserListP
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "Never";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return date.toLocaleString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    });
   };
 
   const getRoleLabel = (role: string) => {

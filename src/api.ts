@@ -1,4 +1,4 @@
-import type { CallOrderAwardPreview, CallOrderSetupInput, InvoiceCreateInput, InvoicePreview, PortalSnapshot, Role, WeeklyReportInput } from "../shared/types.ts";
+import type { CallOrderAwardPreview, CallOrderSetupInput, InvoiceCreateInput, InvoicePreview, PortalSnapshot, ReportsData, Role, WeeklyMeeting, WeeklyReportInput } from "../shared/types.ts";
 
 // Authentication tokens stored in memory and localStorage
 let accessToken: string | null = null;
@@ -243,6 +243,24 @@ export const api = {
     request(`/api/scope/${scope(callOrderId)}/action-items/${actionItemId}`, { method: "PATCH", body: json(input) }),
   removeActionItem: (callOrderId: string | null, actionItemId: number) =>
     request(`/api/scope/${scope(callOrderId)}/action-items/${actionItemId}`, { method: "DELETE" }),
+
+  // Weekly Meetings (Customer, Program Manager, and Administrator only)
+  getWeeklyMeetings: () => request<{ meetings: WeeklyMeeting[] }>("/api/weekly-meetings"),
+  createWeeklyMeeting: (input: { meetingDate: string; agenda: string }) =>
+    request<{ meetings: WeeklyMeeting[] }>("/api/weekly-meetings", { method: "POST", body: json(input) }),
+  updateWeeklyMeeting: (meetingId: number, input: { meetingDate: string; agenda: string }) =>
+    request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}`, { method: "PATCH", body: json(input) }),
+  removeWeeklyMeeting: (meetingId: number) =>
+    request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}`, { method: "DELETE" }),
+  addMeetingAction: (meetingId: number, input: { description: string; assignedTo: string }) =>
+    request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}/actions`, { method: "POST", body: json(input) }),
+  updateMeetingAction: (meetingId: number, actionId: number, input: { description?: string; assignedTo?: string; status?: string }) =>
+    request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}/actions/${actionId}`, { method: "PATCH", body: json(input) }),
+  removeMeetingAction: (meetingId: number, actionId: number) =>
+    request<{ meetings: WeeklyMeeting[] }>(`/api/weekly-meetings/${meetingId}/actions/${actionId}`, { method: "DELETE" }),
+
+  // Read-only derived reports
+  getReports: () => request<ReportsData>("/api/reports"),
   async searchClosedActionItems(q: string) {
     const res = await fetch(`/api/action-items/archive?q=${enc(q)}`, {
       headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},

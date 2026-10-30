@@ -264,6 +264,70 @@ export interface ActionItem {
   closedAt: string | null;
 }
 
+export interface WeeklyMeetingAction {
+  id: number;
+  description: string;
+  assignedTo: string;
+  status: 'open' | 'closed';
+  createdAt: string;
+  closedAt: string | null;
+}
+
+export interface WeeklyMeeting {
+  id: number;
+  meetingDate: string;
+  agenda: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: number | null;
+  updatedBy: number | null;
+  actions: WeeklyMeetingAction[];
+}
+
+export interface BpaReportPeriod {
+  id: string;
+  popStart: string | null;
+  popEnd: string | null;
+  pop: string;
+  status: 'active' | 'inactive';
+  obligated: number;
+  expended: number;
+  remaining: number;
+}
+
+export interface BpaReportRow {
+  callOrderNumber: string;
+  title: string;
+  status: 'active' | 'inactive';
+  popStart: string | null;
+  popEnd: string | null;
+  obligated: number;
+  expended: number;
+  remaining: number;
+  periods: BpaReportPeriod[];
+}
+
+export interface StaffingReportRow {
+  callOrderNumber: string;
+  callOrderPeriod: string;
+  callOrderTitle: string;
+  name: string;
+  laborCategory: string;
+  rate: number;
+  status: string;
+}
+
+export interface ReportsData {
+  generatedOn: string;
+  bpa: {
+    obligated: number;
+    expended: number;
+    remaining: number;
+    callOrders: BpaReportRow[];
+  };
+  staffing: StaffingReportRow[];
+}
+
 export interface FundingLine { label: string; value: number | null }
 export interface ActivityEntry { title: string; text: string }
 export interface MsrStaffRow { division: string; name: string; start: string; lcat: string }

@@ -13,6 +13,8 @@ import { RegisterPage } from "./components/RegisterPage.tsx";
 import { AdminPage } from "./components/admin/AdminPage.tsx";
 import { ChangePasswordModal } from "./components/ChangePasswordModal.tsx";
 import { CallOrderSetupPage } from "./components/CallOrderSetupPage.tsx";
+import { WeeklyMeetingsPage } from "./components/WeeklyMeetingsPage.tsx";
+import { ReportsPage } from "./components/ReportsPage.tsx";
 import { ToastContainer, ConfirmDialog } from "./components/ui.tsx";
 import { normalizeCallOrderId } from "./lib/format.ts";
 
@@ -258,6 +260,10 @@ export default function App() {
       )}
       {page === "admin" ? (
         <AdminPage role={user?.role || "customer"} />
+      ) : page === "meetings" ? (
+        <WeeklyMeetingsPage />
+      ) : page === "reports" ? (
+        <ReportsPage />
       ) : !snapshot ? (
         <div className="loading">{error ? "The portal data could not be loaded." : "Loading portal data…"}</div>
       ) : page === "deliverables" ? (

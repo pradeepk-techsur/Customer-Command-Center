@@ -25,6 +25,8 @@ import staffingRouter from "./routes/staffing.ts";
 import actionItemsRouter, { archiveRouter as actionItemsArchiveRouter } from "./routes/action-items.ts";
 import approvedUsersRouter from "./routes/approved-users.ts";
 import callOrdersRouter from "./routes/call-orders.ts";
+import weeklyMeetingsRouter from "./routes/weekly-meetings.ts";
+import reportsRouter from "./routes/reports.ts";
 import { normalizeCallNumber } from "./call-order-setup.ts";
 import { normalizeCurrency } from "../shared/money.ts";
 
@@ -85,14 +87,16 @@ app.use("/api/scope/:callOrderId/risks-issues", risksIssuesRouter);
 app.use("/api/action-items/archive", actionItemsArchiveRouter);
 app.use("/api/staffing", staffingRouter);
 app.use("/api/call-orders", callOrdersRouter);
+app.use("/api/weekly-meetings", weeklyMeetingsRouter);
+app.use("/api/reports", reportsRouter);
 
 type Db = pg.PoolClient;
 
 async function audit(db: Db, req: express.Request, action: string, entity: string, entityId: string | number | null, details?: unknown) {
   const actor = actorOf(req);
   await db.query(
-    "insert into audit_log (actor, role, action, entity, entity_id, details) values ($1,$2,$3,$4,$5,$6)",
-    [actor.name, actor.role, action, entity, entityId === null ? null : String(entityId), details === undefined ? null : JSON.stringify(details)],
+    "insert into audit_log (actor, role, action, entity, entity_id, details, user_id) values ($1,$2,$3,$4,$5,$6,$7)",
+    [actor.name, actor.role, action, entity, entityId === null ? null : String(entityId), details === undefined ? null : JSON.stringify(details), actor.userId ?? req.user?.id ?? null],
   );
 }
 

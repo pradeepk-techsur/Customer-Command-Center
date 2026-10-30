@@ -1,6 +1,6 @@
 import type { Role } from "../../shared/types.ts";
 
-export type Page = "orders" | "admin" | "deliverables" | "contractfile";
+export type Page = "orders" | "admin" | "deliverables" | "contractfile" | "meetings" | "reports";
 
 export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
   page: Page; role: Role; userName?: string; contract: { agency: string; vehicle: string; number: string };
@@ -10,6 +10,7 @@ export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
   const isProgramManager = role === "program_manager";
   // pm (Aidan/Jessica) can only reach the Approved Sign-in List within Admin, per decision #4.
   const canAccessAdmin = role === "admin" || role === "program_manager" || role === "pm";
+  const canAccessMeetingsAndReports = role === "admin" || role === "program_manager" || role === "customer";
 
   return (
     <header className="masthead">
@@ -22,6 +23,8 @@ export function Masthead({ page, role, userName, contract, onPage, onLogout }: {
           <button type="button" className={"nav-tab" + (page === "orders" ? " active" : "")} onClick={() => onPage("orders")}>BPA Dashboard</button>
           <button type="button" className={"nav-tab" + (page === "deliverables" ? " active" : "")} onClick={() => onPage("deliverables")}>Contracts Deliverables</button>
           <button type="button" className={"nav-tab" + (page === "contractfile" ? " active" : "")} onClick={() => onPage("contractfile")}>Contract File</button>
+          {canAccessMeetingsAndReports && <button type="button" className={"nav-tab" + (page === "meetings" ? " active" : "")} onClick={() => onPage("meetings")}>Weekly Meetings</button>}
+          {canAccessMeetingsAndReports && <button type="button" className={"nav-tab" + (page === "reports" ? " active" : "")} onClick={() => onPage("reports")}>Reports</button>}
           {canAccessAdmin && (
             <button type="button" className={"nav-tab" + (page === "admin" ? " active" : "")} onClick={() => onPage("admin")}>{isProgramManager ? "Manage Users" : "Admin"}</button>
           )}
