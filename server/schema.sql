@@ -282,6 +282,35 @@ create table if not exists user_call_orders (
 create index if not exists user_call_orders_user_idx on user_call_orders(user_id);
 create index if not exists user_call_orders_call_order_idx on user_call_orders(call_order_id);
 
+-- Transactional outbox for customer-facing document email notifications.
+-- One row per recipient makes delivery retries and duplicate prevention independent.
+create table if not exists email_notification_jobs (
+  id                bigserial primary key,
+  event_key         text not null,
+  recipient_user_id integer not null references users(id) on delete cascade,
+  recipient_email   text not null,
+  call_order_id     text references call_orders(id) on delete cascade,
+  requires_assigned_call_order boolean not null default false,
+  document_type     text not null,
+  document_name     text not null,
+  scope_label       text,
+  period_label      text,
+  uploaded_by       text,
+  dashboard_path    text not null default '/',
+  status            text not null default 'pending' check (status in ('pending', 'processing', 'sent', 'failed', 'skipped')),
+  attempts          integer not null default 0,
+  next_attempt_at   timestamptz not null default now(),
+  locked_at         timestamptz,
+  sent_at           timestamptz,
+  last_error        text,
+  created_at        timestamptz not null default now(),
+  unique (event_key, recipient_user_id)
+);
+create index if not exists email_notification_jobs_pending_idx
+  on email_notification_jobs(status, next_attempt_at, id);
+create index if not exists email_notification_jobs_recipient_idx
+  on email_notification_jobs(recipient_user_id, created_at desc);
+
 -- ============================================================================
 -- Migration: Add program_manager role
 -- ============================================================================

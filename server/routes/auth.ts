@@ -18,10 +18,9 @@ import {
   createSession,
   validateSession,
   invalidateSession,
-  invalidateAllSessions,
   updateLastLogin,
   createPasswordResetToken,
-  validatePasswordResetToken,
+  resetPasswordWithToken,
   createMagicLinkToken,
   verifyAndConsumeMagicLinkToken,
   logAuthEvent,
@@ -529,17 +528,20 @@ router.post("/password-reset/request", resetLimiter, async (req, res) => {
     // Generate reset token
     const resetToken = await createPasswordResetToken(user.id);
 
-    // Send reset email
-    await sendPasswordResetEmail(user.email, user.name, resetToken);
+    // Keep the public response generic even when delivery fails so account existence
+    // cannot be inferred from status codes or response bodies.
+    sendPasswordResetEmail(user.email, user.name, resetToken).catch((error) =>
+      console.error("Password reset email delivery failed:", error)
+    );
 
     res.json({
       message: "If an account with that email exists, a password reset link has been sent",
     });
   } catch (error) {
     console.error("Password reset request error:", error);
-    res.status(500).json({
-      error: "Password reset request failed",
-      message: "An error occurred while processing your request",
+    // Keep the response indistinguishable from a successful request.
+    res.json({
+      message: "If an account with that email exists, a password reset link has been sent",
     });
   }
 });
@@ -570,27 +572,15 @@ router.post("/password-reset/confirm", async (req, res) => {
       return;
     }
 
-    // Validate and consume reset token
-    const userId = await validatePasswordResetToken(token);
-    if (!userId) {
+    const passwordHash = await hashPassword(password);
+    const reset = await resetPasswordWithToken(token, passwordHash);
+    if (!reset) {
       res.status(400).json({
         error: "Invalid or expired token",
         message: "Password reset token is invalid or has expired",
       });
       return;
     }
-
-    // Hash new password
-    const passwordHash = await hashPassword(password);
-
-    // Update user password
-    await pool.query(
-      `update users set password_hash = $1, updated_at = now() where id = $2`,
-      [passwordHash, userId]
-    );
-
-    // Invalidate all existing sessions for security
-    await invalidateAllSessions(userId);
 
     res.json({
       message: "Password reset successfully. Please log in with your new password.",

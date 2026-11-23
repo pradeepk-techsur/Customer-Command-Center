@@ -4,6 +4,7 @@ import { pool } from "../db.ts";
 import { audit, mutation, num, str } from "../route-helpers.ts";
 import { captureStaffSnapshot, captureLcatSnapshot } from "../snapshot-history.ts";
 import { upload } from "../uploads.ts";
+import { enqueueDocumentNotifications } from "../notification-service.ts";
 
 const router = express.Router();
 router.use(authenticateRequest, requirePm);
@@ -57,6 +58,16 @@ router.post("/:staffId/property-return", upload.single("file"), mutation(async (
   await captureStaffSnapshot(db, s.call_order_id, req.user?.id ?? null, "update", s.id, `Property return doc uploaded for ${s.name}`);
   await db.query("update staff set property_return_doc_href = $2 where id = $1", [s.id, `/uploads/${file.filename}`]);
   await audit(db, req, "staff.property_return", "staff", s.id, { callOrderId: s.call_order_id });
+  await enqueueDocumentNotifications(db, {
+    eventKey: `staff:${s.id}:property-return:${file.filename}`,
+    documentType: "Property return document",
+    documentName: file.originalname,
+    callOrderId: s.call_order_id,
+    scopeLabel: s.call_order_id,
+    uploadedBy: req.user?.name,
+    uploaderUserId: req.user?.id,
+    dashboardPath: `/?callOrder=${encodeURIComponent(s.call_order_id)}&staff=${s.id}`,
+  });
 }));
 
 // ---- Equipment ------------------------------------------------------------------------------

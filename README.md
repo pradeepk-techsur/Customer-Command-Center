@@ -83,7 +83,16 @@ See [AUDIT-SYSTEM.md](./AUDIT-SYSTEM.md) for complete documentation.
 
 - Email/password authentication
 - Microsoft Azure AD SSO integration
+- Email password recovery with one-hour, single-use reset links
 - Role-based access control (Customer, PM, Program Manager, Admin)
+
+### Email notifications
+
+- Active customers receive email when a document they are authorized to view becomes available.
+- Call-order notifications follow `user_call_orders`; BPA notifications go to all active customers.
+- Monthly and consolidated weekly report files notify customers only when released to them.
+- Delivery uses the PostgreSQL `email_notification_jobs` outbox with duplicate prevention and retries.
+- Configure SMTP and the public `FRONTEND_URL` in `.env`; without SMTP, email content is logged in development.
 
 ## What the portal does
 

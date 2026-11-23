@@ -15,6 +15,8 @@ import { ChangePasswordModal } from "./components/ChangePasswordModal.tsx";
 import { CallOrderSetupPage } from "./components/CallOrderSetupPage.tsx";
 import { WeeklyMeetingsPage } from "./components/WeeklyMeetingsPage.tsx";
 import { ReportsPage } from "./components/ReportsPage.tsx";
+import { ForgotPasswordPage } from "./components/ForgotPasswordPage.tsx";
+import { ResetPasswordPage } from "./components/ResetPasswordPage.tsx";
 import { ToastContainer, ConfirmDialog } from "./components/ui.tsx";
 import { normalizeCallOrderId } from "./lib/format.ts";
 
@@ -36,6 +38,8 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showRegister, setShowRegister] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [page, setPage] = useState<Page>("orders");
   const [selected, setSelected] = useState<string | null>(null);
@@ -67,6 +71,12 @@ export default function App() {
       const accessToken = params.get("accessToken");
       const refreshTokenParam = params.get("refreshToken");
       const error = params.get("error");
+
+      if (window.location.pathname === "/reset-password") {
+        setResetToken(params.get("token") ?? "");
+        setAuthLoading(false);
+        return;
+      }
 
       // Handle OAuth errors
       if (error) {
@@ -160,6 +170,29 @@ export default function App() {
     }
   }, [user]);
 
+  // Apply links from notification emails after the authorized snapshot is available.
+  useEffect(() => {
+    if (!user || !snapshot) return;
+    const params = new URLSearchParams(window.location.search);
+    const linkedPage = params.get("page");
+    const linkedCallOrder = params.get("callOrder");
+    const linkedTab = params.get("tab");
+    const linkedStaff = Number(params.get("staff"));
+    const pages: Page[] = ["orders", "admin", "deliverables", "contractfile", "meetings", "reports"];
+    const tabs: Tab[] = ["General", "Financials", "People", "Invoices", "Contract File", "Risks", "Issues", "Action Items", "Weekly Status Reports", "History"];
+
+    if (linkedPage && pages.includes(linkedPage as Page)) setPage(linkedPage as Page);
+    if (linkedCallOrder && snapshot.callOrders.some((order) => order.id === linkedCallOrder)) {
+      setPage("orders");
+      setSelected(linkedCallOrder);
+      if (linkedTab && tabs.includes(linkedTab as Tab)) setTab(linkedTab as Tab);
+      if (linkedStaff && snapshot.callOrders.some((order) => order.staff.some((staff) => staff.id === linkedStaff))) {
+        setSelectedStaffId(linkedStaff);
+      }
+    }
+    if (linkedPage || linkedCallOrder) window.history.replaceState({}, "", "/");
+  }, [snapshot, user]);
+
   const handleLogin = async (accessToken: string, refreshToken: string) => {
     setTokens(accessToken, refreshToken);
     setError(null);
@@ -220,6 +253,16 @@ export default function App() {
   }
 
   if (!user) {
+    if (resetToken !== null) {
+      return <ResetPasswordPage token={resetToken} onBack={() => {
+        window.history.replaceState({}, "", "/");
+        setResetToken(null);
+        setError(null);
+      }} />;
+    }
+    if (showForgotPassword) {
+      return <ForgotPasswordPage onBack={() => setShowForgotPassword(false)} />;
+    }
     return showRegister ? (
       <RegisterPage 
         onRegister={handleLogin} 
@@ -229,6 +272,7 @@ export default function App() {
       <LoginPage 
         onLogin={handleLogin} 
         onShowRegister={() => setShowRegister(true)} 
+        onForgotPassword={() => setShowForgotPassword(true)}
         message={error ?? undefined}
       />
     );

@@ -17,6 +17,18 @@ const EMAIL_PASS = process.env.EMAIL_PASS || "";
 const EMAIL_FROM = process.env.EMAIL_FROM || "noreply@techsur.com";
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
+  })[character]!);
+}
+
+function frontendLink(path: string): string {
+  const base = FRONTEND_URL.replace(/\/$/, "");
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${suffix}`;
+}
+
 // ============================================================================
 // Email Transporter
 // ============================================================================
@@ -56,6 +68,8 @@ export function isEmailConfigured(): boolean {
 // ============================================================================
 
 function passwordResetEmailHtml(resetUrl: string, userName: string): string {
+  const safeUrl = escapeHtml(resetUrl);
+  const safeName = escapeHtml(userName);
   return `
     <!DOCTYPE html>
     <html>
@@ -76,14 +90,14 @@ function passwordResetEmailHtml(resetUrl: string, userName: string): string {
         </div>
         <div class="content">
           <h2>Password Reset Request</h2>
-          <p>Hello ${userName},</p>
+           <p>Hello ${safeName},</p>
           <p>We received a request to reset your password for TechSur Mission Control.</p>
           <p>Click the button below to reset your password:</p>
           <p style="text-align: center;">
-            <a href="${resetUrl}" class="button">Reset Password</a>
+             <a href="${safeUrl}" class="button">Reset Password</a>
           </p>
           <p>Or copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; color: #B0832A;">${resetUrl}</p>
+           <p style="word-break: break-all; color: #B0832A;">${safeUrl}</p>
           <p><strong>This link will expire in 1 hour.</strong></p>
           <p>If you didn't request a password reset, you can safely ignore this email.</p>
         </div>
@@ -120,6 +134,8 @@ This is an automated message, please do not reply.
 
 function welcomeEmailHtml(userName: string, userEmail: string): string {
   const loginUrl = `${FRONTEND_URL}/login`;
+  const safeName = escapeHtml(userName);
+  const safeEmail = escapeHtml(userEmail);
   return `
     <!DOCTYPE html>
     <html>
@@ -140,9 +156,9 @@ function welcomeEmailHtml(userName: string, userEmail: string): string {
         </div>
         <div class="content">
           <h2>Account Created Successfully</h2>
-          <p>Hello ${userName},</p>
+           <p>Hello ${safeName},</p>
           <p>Your account has been created for TechSur Mission Control.</p>
-          <p><strong>Email:</strong> ${userEmail}</p>
+           <p><strong>Email:</strong> ${safeEmail}</p>
           <p>You can now log in to access your contract information, financial reports, and staffing data.</p>
           <p style="text-align: center;">
             <a href="${loginUrl}" class="button">Log In</a>
@@ -208,6 +224,7 @@ export async function sendPasswordResetEmail(
   };
 
   if (!isEmailConfigured()) {
+    if (process.env.NODE_ENV === "production") throw new Error("Email service is not configured");
     console.log("\n📧 [Email Service - DEV MODE]");
     console.log("━".repeat(60));
     console.log(`To: ${email}`);
@@ -246,6 +263,7 @@ export async function sendWelcomeEmail(
   };
 
   if (!isEmailConfigured()) {
+    if (process.env.NODE_ENV === "production") throw new Error("Email service is not configured");
     console.log("\n📧 [Email Service - DEV MODE]");
     console.log("━".repeat(60));
     console.log(`To: ${email}`);
@@ -281,6 +299,7 @@ This is an automated message, please do not reply.
 }
 
 function magicLinkEmailHtml(magicLinkUrl: string, expiryMinutes: number): string {
+  const safeUrl = escapeHtml(magicLinkUrl);
   return `
     <!DOCTYPE html>
     <html>
@@ -299,9 +318,9 @@ function magicLinkEmailHtml(magicLinkUrl: string, expiryMinutes: number): string
         <div class="header"><h1>TechSur Mission Control</h1></div>
         <div class="content">
           <h2>Sign-in Link</h2>
-          <p style="text-align: center;"><a href="${magicLinkUrl}" class="button">Sign In</a></p>
+           <p style="text-align: center;"><a href="${safeUrl}" class="button">Sign In</a></p>
           <p>Or copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; color: #0066cc;">${magicLinkUrl}</p>
+           <p style="word-break: break-all; color: #0066cc;">${safeUrl}</p>
           <p><strong>This link will expire in ${expiryMinutes} minutes.</strong></p>
           <p>If you didn't request this, you can safely ignore this email.</p>
         </div>
@@ -329,6 +348,7 @@ export async function sendMagicLinkEmail(
   };
 
   if (!isEmailConfigured()) {
+    if (process.env.NODE_ENV === "production") throw new Error("Email service is not configured");
     console.log("\n📧 [Email Service - DEV MODE]");
     console.log("━".repeat(60));
     console.log(`To: ${email}`);
@@ -346,6 +366,103 @@ export async function sendMagicLinkEmail(
     console.error(`❌ Failed to send magic-link email to ${email}:`, error);
     throw new Error("Failed to send magic-link email");
   }
+}
+
+export interface DocumentNotificationEmailInput {
+  documentType: string;
+  documentName: string;
+  scopeLabel: string | null;
+  periodLabel: string | null;
+  uploadedBy: string | null;
+  dashboardPath: string;
+}
+
+function documentNotificationText(input: DocumentNotificationEmailInput, dashboardUrl: string): string {
+  const details = [
+    `Document: ${input.documentName}`,
+    `Type: ${input.documentType}`,
+    input.scopeLabel && `Scope: ${input.scopeLabel}`,
+    input.periodLabel && `Period: ${input.periodLabel}`,
+    input.uploadedBy && `Posted by: ${input.uploadedBy}`,
+  ].filter(Boolean).join("\n");
+  return `
+TechSur Mission Control - New Document Available
+
+A document is now available to you in Mission Control.
+
+${details}
+
+Open Mission Control:
+${dashboardUrl}
+
+---
+TechSur Mission Control - AOUSC BPA TSO Support Services
+This is an automated message, please do not reply.
+  `.trim();
+}
+
+function documentNotificationHtml(input: DocumentNotificationEmailInput, dashboardUrl: string): string {
+  const detailRows = [
+    ["Document", input.documentName],
+    ["Type", input.documentType],
+    ["Scope", input.scopeLabel],
+    ["Period", input.periodLabel],
+    ["Posted by", input.uploadedBy],
+  ].filter((entry): entry is [string, string] => Boolean(entry[1]));
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #1A1A1A; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background: #0A0A0A; color: #FBCA5C; padding: 20px; text-align: center; }
+      .content { background: #F5F5F2; padding: 30px; border-radius: 5px; margin: 20px 0; }
+      .button { display: inline-block; padding: 12px 30px; background: #0A0A0A; color: #FBCA5C; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+      .details { width: 100%; border-collapse: collapse; margin: 18px 0; }
+      .details th { text-align: left; color: #6b675f; width: 110px; padding: 5px 10px 5px 0; vertical-align: top; }
+      .details td { padding: 5px 0; }
+      .footer { text-align: center; color: #6c757d; font-size: 12px; margin-top: 30px; }
+    </style></head>
+    <body><div class="container">
+      <div class="header"><h1>TechSur Mission Control</h1></div>
+      <div class="content">
+        <h2>New document available</h2>
+        <p>A document is now available to you in Mission Control.</p>
+        <table class="details">${detailRows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join("")}</table>
+        <p style="text-align:center"><a href="${escapeHtml(dashboardUrl)}" class="button">Open Mission Control</a></p>
+      </div>
+      <div class="footer"><p>TechSur Mission Control - AOUSC BPA TSO Support Services</p><p>This is an automated message, please do not reply.</p></div>
+    </div></body></html>
+  `;
+}
+
+/** Send a customer-facing document notification. Failures are retried by the outbox worker. */
+export async function sendDocumentNotificationEmail(
+  email: string,
+  input: DocumentNotificationEmailInput,
+): Promise<void> {
+  const dashboardUrl = frontendLink(input.dashboardPath);
+  const mailOptions = {
+    from: EMAIL_FROM,
+    to: email,
+    subject: `New document available: ${input.documentName.replace(/[\r\n]+/g, " ")}`,
+    text: documentNotificationText(input, dashboardUrl),
+    html: documentNotificationHtml(input, dashboardUrl),
+  };
+
+  if (!isEmailConfigured()) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Email service is not configured");
+    }
+    console.log("\n📧 [Email Service - DEV MODE]");
+    console.log(`To: ${email}`);
+    console.log(`Subject: ${mailOptions.subject}`);
+    console.log(mailOptions.text);
+    return;
+  }
+
+  const info = await getTransporter().sendMail(mailOptions);
+  console.log(`✅ Document notification sent to ${email}: ${info.messageId}`);
 }
 
 /**

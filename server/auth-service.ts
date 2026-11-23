@@ -6,7 +6,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { pool } from "./db.ts";
+import { pool, withTransaction } from "./db.ts";
 
 // ============================================================================
 // Configuration
@@ -257,6 +257,10 @@ export function generateResetToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
+export function hashPasswordResetToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 /**
  * Create a password reset token in the database.
  * @param userId - User ID
@@ -264,13 +268,21 @@ export function generateResetToken(): string {
  */
 export async function createPasswordResetToken(userId: number): Promise<string> {
   const token = generateResetToken();
+  const tokenHash = hashPasswordResetToken(token);
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
-  
-  await pool.query(
-    `insert into password_resets (user_id, token, expires_at)
-     values ($1, $2, $3)`,
-    [userId, token, expiresAt]
-  );
+
+  await withTransaction(async (db) => {
+    await db.query(
+      `update password_resets set used = true, used_at = now()
+        where user_id = $1 and used = false`,
+      [userId],
+    );
+    await db.query(
+      `insert into password_resets (user_id, token, expires_at)
+       values ($1, $2, $3)`,
+      [userId, tokenHash, expiresAt],
+    );
+  });
   
   return token;
 }
@@ -367,33 +379,28 @@ export async function verifyAndConsumeMagicLinkToken(token: string): Promise<Mag
   return { outcome: "used", approvedUserId: row.approved_user_id };
 }
 
-/**
- * Validate and consume a password reset token.
- * @param token - Reset token string
- * @returns User ID if valid, null if expired or already used
- */
-export async function validatePasswordResetToken(token: string): Promise<number | null> {
-  const result = await pool.query<{ user_id: number }>(
-    `select user_id from password_resets
-     where token = $1
-       and expires_at > now()
-       and used = false`,
-    [token]
-  );
-  
-  if (result.rows.length === 0) {
-    return null;
-  }
-  
-  // Mark token as used
-  await pool.query(
-    `update password_resets
-     set used = true, used_at = now()
-     where token = $1`,
-    [token]
-  );
-  
-  return result.rows[0].user_id;
+/** Atomically consume a reset token, replace the password, and revoke every session. */
+export async function resetPasswordWithToken(token: string, passwordHash: string): Promise<boolean> {
+  const tokenHash = hashPasswordResetToken(token);
+  return withTransaction(async (db) => {
+    const result = await db.query<{ user_id: number }>(
+      `update password_resets
+          set used = true, used_at = now()
+        where token = $1 and expires_at > now() and used = false
+        returning user_id`,
+      [tokenHash],
+    );
+    const userId = result.rows[0]?.user_id;
+    if (!userId) return false;
+    await db.query(
+      `update users
+          set password_hash = $1, must_reset_password = false, updated_at = now()
+        where id = $2 and auth_provider = 'email'`,
+      [passwordHash, userId],
+    );
+    await db.query("delete from sessions where user_id = $1", [userId]);
+    return true;
+  });
 }
 
 // ============================================================================

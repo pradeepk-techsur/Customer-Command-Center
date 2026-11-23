@@ -13,6 +13,7 @@ import { parseCallOrderAward } from "../call-order-award-parser.ts";
 import { validateCallOrderSetup } from "../call-order-setup.ts";
 import type { CallOrderSetupInput } from "../../shared/types.ts";
 import type { Db } from "../route-helpers.ts";
+import { enqueueDocumentNotifications } from "../notification-service.ts";
 
 const router = express.Router();
 const awardUpload = multer({
@@ -169,6 +170,16 @@ router.post("/", authenticateRequest, requireProgramManager, awardUpload.single(
           [setup.id, documentName, storedHref, preview?.awardDate ?? null],
         );
         documentId = result.rows[0].id;
+        await enqueueDocumentNotifications(db, {
+          eventKey: `contract-document:${documentId}:created`,
+          documentType: "Base award",
+          documentName,
+          callOrderId: setup.id!,
+          scopeLabel: setup.name,
+          uploadedBy: req.user?.name,
+          uploaderUserId: req.user?.id,
+          dashboardPath: `/?callOrder=${encodeURIComponent(setup.id!)}&tab=Contract%20File`,
+        });
       }
 
       await audit(db, req, "call_order.create", "call_order", setup.id!, {

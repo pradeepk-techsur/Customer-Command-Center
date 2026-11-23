@@ -2,6 +2,7 @@ import express from "express";
 import { authenticateRequest, requirePm } from "../auth-middleware.ts";
 import { audit, mutation, str, callOrderIdParam, requireScopedCallOrderAccess } from "../route-helpers.ts";
 import { upload } from "../uploads.ts";
+import { enqueueDocumentNotifications } from "../notification-service.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(authenticateRequest, requirePm, requireScopedCallOrderAccess);
@@ -25,6 +26,19 @@ router.post("/", upload.single("file"), mutation(async (db, req, res) => {
      linkType === "url" ? url : null, str(req.body?.dueDate), str(req.body?.deliveryDate)],
   );
   await audit(db, req, "deliverable.create", "deliverable", rows[0].id, { callOrderId, name });
+  if (file) {
+    await enqueueDocumentNotifications(db, {
+      eventKey: `deliverable:${rows[0].id}:file-created`,
+      documentType: str(req.body?.category) || "Deliverable",
+      documentName: name,
+      callOrderId,
+      scopeLabel: callOrderId ?? "BPA",
+      periodLabel: str(req.body?.periodLabel),
+      uploadedBy: req.user?.name,
+      uploaderUserId: req.user?.id,
+      dashboardPath: "/?page=deliverables",
+    });
+  }
 }));
 
 router.patch("/:deliverableId", mutation(async (db, req, res) => {

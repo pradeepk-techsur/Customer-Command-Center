@@ -10,6 +10,7 @@ import { uploadsDir } from "../uploads.ts";
 import { parseInvoicePdf } from "../invoice-parser.ts";
 import { validateInvoiceInput } from "../invoice-input.ts";
 import type { InvoiceCreateInput, InvoicePreview } from "../../shared/types.ts";
+import { enqueueDocumentNotifications } from "../notification-service.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(authenticateRequest, requirePm, requireScopedCallOrderAccess);
@@ -125,6 +126,19 @@ router.post("/", receiveInvoice, async (req, res, next) => {
         fileAttached: Boolean(file),
         values: invoice,
       });
+      if (file) {
+        await enqueueDocumentNotifications(db, {
+          eventKey: `invoice:${rows[0].id}:file-created`,
+          documentType: "Invoice",
+          documentName: file.originalname,
+          callOrderId,
+          scopeLabel: callOrderId ?? "BPA",
+          periodLabel: invoice.periodStart && invoice.periodEnd ? `${invoice.periodStart} – ${invoice.periodEnd}` : null,
+          uploadedBy: req.user?.name,
+          uploaderUserId: req.user?.id,
+          dashboardPath: callOrderId ? `/?callOrder=${encodeURIComponent(callOrderId)}&tab=Financials` : "/?page=contractfile",
+        });
+      }
       return buildSnapshot(db, req.user!.id, req.user!.role);
     });
     res.status(201).json(snapshot);
@@ -155,6 +169,16 @@ router.post("/:invoiceId/file", receiveInvoice, async (req, res, next) => {
       await audit(db, req, invoice.file_href ? "invoice.file.replace" : "invoice.file.attach", "invoice", invoice.id, {
         callOrderId,
         fileName: file.originalname,
+      });
+      await enqueueDocumentNotifications(db, {
+        eventKey: `invoice:${invoice.id}:file:${stored.href}`,
+        documentType: invoice.file_href ? "Updated invoice" : "Invoice",
+        documentName: file.originalname,
+        callOrderId,
+        scopeLabel: callOrderId ?? "BPA",
+        uploadedBy: req.user?.name,
+        uploaderUserId: req.user?.id,
+        dashboardPath: callOrderId ? `/?callOrder=${encodeURIComponent(callOrderId)}&tab=Financials` : "/?page=contractfile",
       });
       return {
         snapshot: await buildSnapshot(db, req.user!.id, req.user!.role),

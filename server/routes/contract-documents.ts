@@ -5,6 +5,7 @@ import { audit, mutation, num, str, bool, callOrderIdParam, requireScopedCallOrd
 import { upload } from "../uploads.ts";
 import { parseContractDocument } from "../contract-document-parser.ts";
 import { captureContractDocumentSnapshot } from "../snapshot-history.ts";
+import { enqueueDocumentNotifications } from "../notification-service.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(authenticateRequest, requirePm, requireScopedCallOrderAccess);
@@ -34,6 +35,16 @@ router.post("/", upload.single("file"), mutation(async (db, req, res) => {
   // Contract documents can be BPA-level (callOrderId null) — history is only tracked per call order.
   if (callOrderId) await captureContractDocumentSnapshot(db, callOrderId, req.user?.id ?? null, "add", rows[0].id, `Uploaded ${name}`);
   await audit(db, req, "contract_document.create", "contract_document", rows[0].id, { callOrderId, name });
+  await enqueueDocumentNotifications(db, {
+    eventKey: `contract-document:${rows[0].id}:created`,
+    documentType: "Contract document",
+    documentName: name,
+    callOrderId,
+    scopeLabel: callOrderId ?? "BPA",
+    uploadedBy: req.user?.name,
+    uploaderUserId: req.user?.id,
+    dashboardPath: callOrderId ? `/?callOrder=${encodeURIComponent(callOrderId)}&tab=Contract%20File` : "/?page=contractfile",
+  });
 }));
 
 router.patch("/:documentId", mutation(async (db, req, res) => {

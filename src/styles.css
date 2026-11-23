@@ -178,6 +178,20 @@ h1 { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spac
 .textarea.small { font-size: 12px; }
 .select { padding: 5px 7px; font-size: 12px; width: auto; }
 .remove-btn { text-align: right; font-family: var(--mono); font-size: 14px; color: var(--ghost); cursor: pointer; background: none; border: 0; padding: 0; }
+
+/* Authentication and password recovery */
+.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--page); }
+.auth-card { width: 100%; max-width: 420px; padding: 40px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+.auth-sub { margin: 8px 0 26px; color: var(--muted); font-size: 14px; }
+.auth-field { display: grid; gap: 8px; margin-bottom: 18px; font-size: 14px; font-weight: 500; }
+.auth-primary { width: 100%; padding: 12px; border: 0; border-radius: 4px; background: var(--accent-fill); color: var(--accent-fill-ink); font: 700 15px var(--sans); cursor: pointer; }
+.auth-primary:disabled { opacity: 0.65; cursor: default; }
+.auth-link { display: block; margin: 20px auto 0; padding: 0; border: 0; background: none; color: var(--accent); font: 14px var(--sans); text-decoration: underline; cursor: pointer; }
+.auth-link.inline { display: inline; margin: 0; font-size: 13px; }
+.auth-message { padding: 12px; margin: 18px 0; border: 1px solid; border-radius: 4px; font-size: 14px; }
+.auth-message.success { color: #2a6b2a; background: #eef7ee; border-color: #cde8cd; }
+.auth-message.error { color: #a32929; background: #fff0f0; border-color: #f2caca; }
+.auth-help { color: var(--muted); font-size: 12px; }
 .remove-btn:hover { color: var(--warn); }
 
 .uploader { display: flex; align-items: center; gap: 16px; border: 1px dashed var(--line-control); background: var(--surface); border-radius: 3px; padding: 18px 22px; margin-bottom: 20px; }

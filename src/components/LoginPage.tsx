@@ -3,10 +3,11 @@ import { useState } from "react";
 interface LoginPageProps {
   onLogin: (accessToken: string, refreshToken: string) => void;
   onShowRegister: () => void;
+  onForgotPassword: () => void;
   message?: string;
 }
 
-export function LoginPage({ onLogin, onShowRegister, message }: LoginPageProps) {
+export function LoginPage({ onLogin, onShowRegister, onForgotPassword, message }: LoginPageProps) {
   const [mode] = useState<"password" | "magic-link">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -164,6 +165,9 @@ export function LoginPage({ onLogin, onShowRegister, message }: LoginPageProps) 
                 }}
                 placeholder="Enter your password"
               />
+              <div style={{ textAlign: "right", marginTop: 8 }}>
+                <button type="button" className="auth-link inline" onClick={onForgotPassword} disabled={loading}>Forgot password?</button>
+              </div>
             </div>
 
             <button

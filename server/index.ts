@@ -29,6 +29,8 @@ import weeklyMeetingsRouter from "./routes/weekly-meetings.ts";
 import reportsRouter from "./routes/reports.ts";
 import { normalizeCallNumber } from "./call-order-setup.ts";
 import { normalizeCurrency } from "../shared/money.ts";
+import { enqueueDocumentNotifications } from "./notification-service.ts";
+import { startNotificationWorker } from "./notification-worker.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -776,6 +778,29 @@ app.post("/api/weekly-reports/consolidated/:weekEnding/submit", authenticateRequ
   );
   
   await audit(db, req, "consolidated_weekly_report.submit", "consolidated_weekly_report", consolidated[0].id, { weekEnding });
+
+  // Individual weekly files stay internal until the consolidated report is released.
+  const { rows: releasedFiles } = await db.query<{
+    id: number; call_order_id: string; file_name: string; week_label: string; submitted_by: string;
+  }>(
+    `select id, call_order_id, file_name, week_label, submitted_by
+       from weekly_reports
+      where week_ending = $1 and href is not null and call_order_id is not null`,
+    [weekEnding],
+  );
+  for (const report of releasedFiles) {
+    await enqueueDocumentNotifications(db, {
+      eventKey: `weekly-report:${report.id}:customer-release`,
+      documentType: "Weekly status report",
+      documentName: report.file_name,
+      callOrderId: report.call_order_id,
+      scopeLabel: report.call_order_id,
+      periodLabel: report.week_label,
+      uploadedBy: report.submitted_by,
+      uploaderUserId: req.user?.id,
+      dashboardPath: `/?callOrder=${encodeURIComponent(report.call_order_id)}&tab=Weekly%20Status%20Reports`,
+    });
+  }
 }));
 
 // Get customer-visible weekly reports (for customers)
@@ -926,6 +951,15 @@ app.post("/api/monthly-reports/upload", authenticateRequest, requireProgramManag
 app.post("/api/monthly-reports/:id/submit", authenticateRequest, requireProgramManager, mutation(async (db, req) => {
   const reportId = parseInt(String(req.params.id), 10);
   if (isNaN(reportId)) throw new Error("Invalid report ID");
+  const { rows: reports } = await db.query<{
+    id: number; file_name: string; href: string | null; period: string; customer_visible: boolean; submitted_by: string;
+  }>("select id, file_name, href, period, customer_visible, submitted_by from monthly_reports where id = $1", [reportId]);
+  const report = reports[0];
+  if (!report) {
+    const error = new Error("Monthly report not found") as Error & { status?: number };
+    error.status = 404;
+    throw error;
+  }
   
   // Update report status to "Submitted to Customer" and make visible to customers
   await db.query(
@@ -939,6 +973,20 @@ app.post("/api/monthly-reports/:id/submit", authenticateRequest, requireProgramM
   );
   
   await audit(db, req, "monthly_report.submit", "monthly_report", reportId, { status: "Submitted to Customer", customer_visible: true });
+  if (report.href) {
+    await enqueueDocumentNotifications(db, {
+      eventKey: `monthly-report:${report.id}:customer-release`,
+      documentType: "Monthly status report",
+      documentName: report.file_name,
+      callOrderId: null,
+      scopeLabel: "BPA",
+      periodLabel: report.period,
+      uploadedBy: report.submitted_by,
+      uploaderUserId: req.user?.id,
+      dashboardPath: "/?page=deliverables",
+      requireAssignedCallOrder: true,
+    });
+  }
 }));
 
 // PM monthly reports - PMs create their own monthly reports
@@ -1189,6 +1237,9 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 const port = Number(process.env.PORT) || 3001;
 migrate()
-  .then(() => app.listen(port, () => console.log(`API listening on http://localhost:${port}`)))
+  .then(() => app.listen(port, () => {
+    console.log(`API listening on http://localhost:${port}`);
+    startNotificationWorker();
+  }))
   .catch((err) => { console.error("Could not apply schema:", err); process.exit(1); });
 
